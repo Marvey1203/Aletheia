@@ -1,0 +1,19 @@
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+
+# LLM Models - these are large binary files and should not be in git
+models/
+
+# Memory Galaxy - this is user-generated data and should not be in git
+memory_galaxy/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.DS_Store
+*.pyc
+
+# Streamlit config
+.streamlit/
