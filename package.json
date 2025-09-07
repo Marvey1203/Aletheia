@@ -1,0 +1,16 @@
+{
+  "name": "aletheia",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0-beta.15"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0-beta.21",
+    "vite": "^5.3.1"
+  }
+}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aletheia</title>
+    <!-- We will link our stylesheet here later if needed -->
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Chat</h1>
+      <div class="input-group">
+        <input id="query-input" type="text" placeholder="Ask Aletheia..." />
+        <button id="reason-button">Reason</button>
+      </div>
+      <div id="response-div">Awaiting query...</div>
+    </div>
+
+    <!-- This script tag must be at the end of the body -->
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
