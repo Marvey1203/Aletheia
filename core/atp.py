@@ -7,7 +7,7 @@ import json
 import re
 import time
 from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from typing import List, Dict, Tuple, Optional, Callable, Any, Literal
 from enum import Enum
 
@@ -331,7 +331,7 @@ Provide a clear, direct answer."""
             return "I'm experiencing difficulties processing your request. Please try again."
 
     def _critique_response(self, query: str, plan: List[str], answer: str) -> Dict[str, float]:
-        """Critique stage with parallel scoring"""
+        """Critique stage with parallel scoring and score normalization."""
         critique_prompt = f"""Critique this answer for query: '{query}'
 
 Plan used: {plan}
@@ -340,16 +340,42 @@ Answer: {answer}
 Use this format:
 {self.STAGE_TEMPLATES[ReasoningStage.CRITIQUE]}
 
-Be rigorous in your assessment."""
+Score each category as a float between 0.0 (terrible) and 1.0 (perfect)."""
         
         try:
             response = self.llm.generate_text(critique_prompt, max_tokens=100)
             parsed = self._parse_stage_output(ReasoningStage.CRITIQUE, response)
-            return parsed.get("scores", {"truth": 0.5, "helpfulness": 0.5, "clarity": 0.5, "ethics": 0.5, "curiosity": 0.0})
+            scores = parsed.get("scores", {})
+
+            # --- BEGIN FIX: SCORE NORMALIZATION ---
+            normalized_scores = {}
+            for key, value in scores.items():
+                try:
+                    score_float = float(value)
+                    # If the model gives a score from 1-10, divide by 10.
+                    if score_float > 1.0:
+                        normalized_scores[key] = score_float / 10.0
+                    # Ensure the score is not negative.
+                    elif score_float < 0.0:
+                        normalized_scores[key] = 0.0
+                    else:
+                        normalized_scores[key] = score_float
+                except (ValueError, TypeError):
+                    # If the score is not a valid number, default to 0.5.
+                    normalized_scores[key] = 0.5
+            
+            # Ensure all required keys are present
+            for required_key in ['truth', 'helpfulness', 'clarity', 'ethics', 'curiosity']:
+                if required_key not in normalized_scores:
+                    normalized_scores[required_key] = 0.5
+
+            return normalized_scores
+            # --- END FIX ---
+
         except Exception as e:
             logger.warning(f"Critique failed: {e}")
             return {"truth": 0.5, "helpfulness": 0.5, "clarity": 0.5, "ethics": 0.5, "curiosity": 0.0}
-
+        
     def _generate_reflection_parallel(self, plan: List[str], answer: str, scores: Dict[str, float]) -> Reflection:
         """Generate reflection in parallel using executor"""
         def create_reflection():
@@ -500,14 +526,94 @@ Be rigorous in your assessment."""
         return trace
 
     def _reason_gear_3(self, query: str, progress_callback: Optional[Callable[[str, Any], None]] = None) -> Trace:
-        """Gear 3 reasoning: Deep analysis (currently same as Gear 2, but will be Polymath Protocol in future)"""
-        # For now, use Gear 2 approach but mark it as Gear 3
-        trace = self._reason_gear_2(query, progress_callback)
+        """Gear 3 reasoning: Deep analysis using the Manifold V2 Polymath Protocol."""
+        logger.info("Engaging Gear 3: Polymath Protocol")
         
-        # Update the summary to reflect Gear 3 usage
-        trace.summary.reasoning = "Generated using Gear 3 (Deep Analysis) - Polymath Protocol placeholder"
+        if progress_callback:
+            progress_callback("gear_3", "Initializing Council of Experts...")
+
+        # For V1 of the Polymath, the personas are fixed. V1.5 will make them dynamic.
+        persona_ids = ["Architect", "Critic", "Strategist"]
         
-        return trace
+        # --- 1. The Parallel Debate ---
+        # We run a full, independent Gear 2 reasoning cycle for each persona in parallel.
+        sub_traces: List[Trace] = []
+        
+        def run_persona_reasoning(persona_id: str) -> Trace:
+            # Create a temporary, specialized IdentityCore for this persona
+            # In the future, this would load a custom `persona.json` file
+            persona_identity = IdentityCore(seed_id=self.identity.seed_id)
+            persona_identity.principles.insert(0, f"You are The {persona_id}. Your reasoning must be guided by this role.")
+            
+            # Create a temporary ATP loop for this persona
+            persona_atp = ATPLoopV2(persona_identity, self.memory, self.llm)
+            
+            # We add the persona_id to the query to give the model context
+            persona_query = f"As The {persona_id}, analyze this query: '{query}'"
+            
+            # Each persona uses the efficient Gear 2 protocol
+            trace = persona_atp._reason_gear_2(persona_query)
+            trace.persona_id = persona_id # Tag the trace with its persona
+            return trace
+
+        with ThreadPoolExecutor(max_workers=len(persona_ids)) as executor:
+            if progress_callback:
+                progress_callback("gear_3", f"Debate started with {persona_ids}...")
+            
+            # Map each persona to the reasoning function
+            future_to_persona = {executor.submit(run_persona_reasoning, pid): pid for pid in persona_ids}
+
+            # We use `as_completed` to process results as they finish.
+            for future in as_completed(future_to_persona):
+                persona_id = future_to_persona[future]
+                try:
+                    result = future.result(timeout=180) # 3-minute timeout per persona
+                    sub_traces.append(result)
+                except FutureTimeoutError:
+                    logger.error(f"Persona '{persona_id}' timed out during reasoning.")
+                    error_trace = self._create_fallback_trace(query, f"Persona '{persona_id}' timed out.")
+                    error_trace.persona_id = persona_id
+                    sub_traces.append(error_trace)
+                except Exception as e:
+                    logger.error(f"Persona '{persona_id}' failed with an exception: {e}")
+                    error_trace = self._create_fallback_trace(query, f"Persona '{persona_id}' failed: {e}")
+                    error_trace.persona_id = persona_id
+                    sub_traces.append(error_trace)
+
+        if progress_callback:
+            progress_callback("gear_3", "Debate complete. Synthesizing results...")
+
+        # --- 2. The Arbiter's Synthesis ---
+        # The Arbiter now receives the winning candidates from the council's debate.
+        
+        arbiter_context = "\n".join([
+            f"--- Proposal from The {trace.persona_id} ---\n{trace.best.candidate}\n"
+            for trace in sub_traces
+        ])
+
+        arbiter_query = f"""
+        You are The Arbiter. You have received the following proposals from your council of experts in response to the original query: '{query}'
+
+        {arbiter_context}
+
+        Your task is to synthesize these competing perspectives into a single, superior, and actionable final answer. Do not just list the options; find the deeper insight that integrates the best parts of each.
+        """
+        
+        # The Arbiter also uses the fast Gear 2 protocol to form its final opinion.
+        arbiter_trace = self._reason_gear_2(arbiter_query)
+        
+        # --- 3. Final Assembly ---
+        # We attach the council's sub_traces to the final Arbiter trace for full auditability.
+        arbiter_trace.sub_traces = sub_traces
+        arbiter_trace.persona_id = "Arbiter"
+        arbiter_trace.summary.reasoning = "Generated using Gear 3 (Polymath Protocol) with a council of experts."
+
+        logger.success("Polymath Protocol completed successfully.")
+        
+        # We save the final, nested trace to memory
+        self.memory.save_trace(arbiter_trace)
+        
+        return arbiter_trace
 
     def reason(self, query: str, progress_callback: Optional[Callable[[str, Any], None]] = None, 
                gear_override: Optional[str] = None) -> Trace:

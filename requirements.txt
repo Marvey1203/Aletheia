@@ -10,3 +10,7 @@ llama-cpp-python==0.2.79
 
 # Dashboard / Observatory
 streamlit==1.36.0
+
+
+# IPC Communication
+pyzmq==25.1.2
