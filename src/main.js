@@ -1,57 +1,115 @@
 // src/main.js
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; 
+import hljs from 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/es/highlight.min.js';
 
-// Get references to our HTML elements.
-// This is safe because the script is loaded at the end of the body.
-const queryInput = document.querySelector('#query-input');
-const reasonButton = document.querySelector('#reason-button');
-const responseDiv = document.querySelector('#response-div');
+// This listener ensures our script only runs after the HTML is fully loaded.
+window.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Element References ---
+    const messageHistory = document.querySelector('#message-history');
+    const queryInput = document.querySelector('#query-input');
+    const reasonButton = document.querySelector('#reason-button');
+    const gearSelector = document.querySelector('#gear-selector'); // This will now be found.
 
-// This function handles the logic for calling the backend
-async function askAletheia() {
-  const query = queryInput.value;
-  if (!query) {
-    responseDiv.innerText = 'Please enter a query.';
-    return;
-  }
+    // --- Core Application Logic ---
 
-  // Update the UI to show we are working
-  responseDiv.innerText = 'Thinking...';
-  reasonButton.disabled = true;
-  queryInput.disabled = true;
+    async function askAletheia() {
+        const query = queryInput.value.trim();
+        if (!query) return;
 
-  try {
-    // Invoke the Rust command `invoke_backend` and pass the query
-    const responseJson = await invoke('invoke_backend', { query });
-    
-    // The response from Python is a JSON string, so we parse it
-    const trace = JSON.parse(responseJson);
+        const selectedGear = gearSelector.querySelector('input[name="gear"]:checked').value;
+        const gearOverride = selectedGear === 'auto' ? null : selectedGear;
 
-    // Display the answer from the trace summary
-    responseDiv.innerHTML = `
-      <p><strong>Answer:</strong> ${trace.summary.answer}</p>
-      <p><strong>Reasoning:</strong> ${trace.summary.reasoning}</p>
-      <p><em>Trace ID: ${trace.trace_id}</em></p>
-    `;
+        queryInput.value = '';
+        queryInput.disabled = true;
+        reasonButton.disabled = true;
+        autoResizeTextarea(queryInput);
 
-  } catch (error) {
-    // If an error occurs, display it
-    responseDiv.innerText = `Error: ${error}`;
-    console.error(error);
-  } finally {
-    // Re-enable the UI elements
-    reasonButton.disabled = false;
-    queryInput.disabled = false;
-  }
-}
+        appendMessage(query, 'user');
 
-// Listen for clicks on the "Reason" button
-reasonButton.addEventListener('click', askAletheia);
+        const pendingBubble = appendMessage('...', 'ai');
+        
+        try {
+            const ack = await invoke('invoke_backend', { query, gearOverride });
+            const { query_id } = JSON.parse(ack);
 
-// Also allow pressing "Enter" in the input field
-queryInput.addEventListener('keypress', (event) => {
-  if (event.key === 'Enter') {
-    askAletheia();
-  }
+            const unlisten = await listen('telemetry-update', (event) => {
+                const telemetry = JSON.parse(event.payload);
+
+                if (telemetry.query_id === query_id) {
+                    const bubbleContent = pendingBubble.querySelector('.message-content');
+
+                    if (telemetry.type === 'stage_update') {
+                        bubbleContent.textContent = `${telemetry.stage.charAt(0).toUpperCase() + telemetry.stage.slice(1)}...`;
+                    } else if (telemetry.type === 'final_result') {
+                        const trace = telemetry.payload;
+                        
+                        const finalAnswerHtml = marked.parse(trace.summary.answer, {
+                            highlight: (code, lang) => {
+                                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                                return hljs.highlight(code, { language }).value;
+                            }
+                        });
+
+                        bubbleContent.innerHTML = finalAnswerHtml;
+                        
+                        unlisten();
+                        enableUI();
+                    }
+                }
+            });
+        } catch (error) {
+            const errorMessage = `Error: ${error.toString()}`;
+            const bubbleContent = pendingBubble.querySelector('.message-content');
+            bubbleContent.innerHTML = `<span style="color: #ff8a8a;">${errorMessage}</span>`;
+            console.error(errorMessage);
+            enableUI();
+        }
+    }
+
+    function appendMessage(text, sender) {
+        const messageContainer = document.createElement('div');
+        messageContainer.className = `message-container ${sender}`;
+
+        const messageBubble = document.createElement('div');
+        messageBubble.className = 'message-bubble';
+        
+        // Use a dedicated div for content to make updates easier
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.textContent = text;
+        messageBubble.appendChild(content);
+
+        messageContainer.appendChild(messageBubble);
+        messageHistory.appendChild(messageContainer);
+
+        messageHistory.scrollTop = messageHistory.scrollHeight;
+        return messageBubble;
+    }
+
+    function enableUI() {
+        queryInput.disabled = false;
+        reasonButton.disabled = false;
+        queryInput.focus();
+    }
+
+    function autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+
+    // --- Event Listeners ---
+    reasonButton.addEventListener('click', askAletheia);
+    queryInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            askAletheia();
+        }
+    });
+    queryInput.addEventListener('input', () => autoResizeTextarea(queryInput));
+
+    // Initial focus
+    queryInput.focus();
 });

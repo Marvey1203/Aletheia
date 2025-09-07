@@ -1,43 +1,43 @@
-# FILE: interfaces/ipc_server.py (DEBUGGING VERSION)
+# interfaces/ipc_server.py
 
-print("Step 1: Starting script...")
 import sys
-from pathlib import Path
 import zmq
+import json
+import uuid
+from pathlib import Path
 from loguru import logger
-print("Step 2: Basic imports OK.")
+from pydantic import BaseModel
 
 # --- Add project root to the Python path for correct module imports ---
 project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.append(project_root)
-print("Step 3: Project root path added.")
 
 # --- Import Core Aletheia Components ---
-print("Step 4: Attempting to import IdentityCore...")
 from core.identity import IdentityCore
-print("Step 5: Attempting to import MemoryGalaxy...")
 from core.memory import MemoryGalaxy
-print("Step 6: Attempting to import LocalLLM...")
 from core.llm import LocalLLM
-print("Step 7: Attempting to import ATPLoopV2...")
 from core.atp import ATPLoopV2
-print("Step 8: All core imports OK.")
+from core.session import SessionManager # Our new Session Manager
 
 # --- Server Configuration ---
-IPC_ADDRESS = "tcp://127.0.0.1:5555"
+COMMAND_ADDRESS = "tcp://127.0.0.1:5555"
+TELEMETRY_ADDRESS = "tcp://127.0.0.1:5556"
 
 def main(dummy_mode: bool = False):
+    """
+    The main function for the Aletheia IPC server.
+    Initializes the AI engine and manages the dual-socket communication.
+    """
     logger.remove()
     logger.add(sys.stdout, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
     logger.info("==========================================================")
     logger.info("Aletheia IPC Server Initializing...")
-    # ... (rest of the file is the same)
-    logger.info(f"IPC Address: {IPC_ADDRESS}")
     logger.info(f"Dummy Mode: {dummy_mode}")
     logger.info("==========================================================")
 
     try:
+        # --- Initialize AI Engine Components ---
         identity_core = IdentityCore()
         memory_galaxy = MemoryGalaxy()
         local_llm = LocalLLM(dummy_mode=dummy_mode)
@@ -46,28 +46,101 @@ def main(dummy_mode: bool = False):
             memory=memory_galaxy,
             llm=local_llm
         )
+        session_manager = SessionManager()
         logger.success("Aletheia Engine is awake and ready.")
 
+        # --- Initialize ZMQ Sockets ---
         context = zmq.Context()
-        socket = context.socket(zmq.REP)
-        socket.bind(IPC_ADDRESS)
-        logger.success(f"ZMQ server is bound and listening on {IPC_ADDRESS}")
+        
+        # Command & Control (C2) Socket
+        command_socket = context.socket(zmq.REP)
+        command_socket.bind(COMMAND_ADDRESS)
+        logger.success(f"C2 server is bound and listening on {COMMAND_ADDRESS}")
+        
+        # Telemetry Publishing Socket
+        telemetry_socket = context.socket(zmq.PUB)
+        telemetry_socket.bind(TELEMETRY_ADDRESS)
+        logger.success(f"Telemetry publisher is bound on {TELEMETRY_ADDRESS}")
 
+        # --- Main Server Loop ---
         while True:
-            query_string = socket.recv_string()
-            logger.info(f"Received query from client: \"{query_string}\"")
+            # 1. Wait for a command on the C2 channel
+            command_json = command_socket.recv_json()
+            logger.info(f"Received command: {command_json}")
 
-            final_trace = atp_loop.reason(query_string)
-            trace_json_string = final_trace.model_dump_json()
+            # 2. Process the command
+            if command_json.get("command") == "reason":
+                payload = command_json.get("payload", {})
+                query = payload.get("query")
+                gear_override = payload.get("gear_override")
+                
+                if not query:
+                    error_response = {"status": "error", "message": "No query provided in payload."}
+                    command_socket.send_json(error_response)
+                    continue
 
-            socket.send_string(trace_json_string)
-            logger.success(f"Sent trace response for ID: {final_trace.trace_id}")
+                query_id = f"query_{uuid.uuid4()}"
+                
+                # 3. Immediately acknowledge the command with a query_id
+                command_socket.send_json({"status": "acknowledged", "query_id": query_id})
+
+                # 4. Define the progress callback for telemetry
+                def progress_callback(stage: str, result: any):
+    
+                    # --- FIX START: Make the payload JSON serializable ---
+                    payload_data = result
+                    if isinstance(result, BaseModel):
+                        # If the result is a Pydantic model (like our Reflection object),
+                        # convert it to a dictionary first.
+                        payload_data = result.model_dump()
+                    # --- FIX END ---
+
+                    telemetry_message = {
+                        "query_id": query_id,
+                        "type": "stage_update",
+                        "stage": stage,
+                        "payload": payload_data # Use the potentially converted data
+                    }
+                    # Publish the message on the query_id topic
+                    telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
+                    telemetry_socket.send_json(telemetry_message)
+                    logger.info(f"Published telemetry for {query_id}: Stage {stage}")
+
+
+                # 5. Generate context and run the reasoning loop
+                context_string = session_manager.generate_trifold_context(query)
+                enriched_query = f"{context_string}\n\nQuery: {query}" # Combine context and query
+
+                final_trace = atp_loop.reason(
+                    enriched_query, 
+                    progress_callback=progress_callback, 
+                    gear_override=gear_override
+                )
+                final_trace.query = query # Overwrite the enriched query with the original for clean history
+
+                # 6. Add the completed trace to our session history
+                session_manager.add_trace_to_current_session(final_trace)
+
+                # 7. Publish the final result on the telemetry stream
+                final_message = {
+                    "query_id": query_id,
+                    "type": "final_result",
+                    "payload": json.loads(final_trace.model_dump_json()) # Ensure it's a dict
+                }
+                telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
+                telemetry_socket.send_json(final_message)
+                logger.success(f"Published final trace for {query_id}")
+
+            else:
+                # Handle unknown commands
+                command_socket.send_json({"status": "error", "message": "Unknown command"})
 
     except Exception as e:
         logger.error(f"A fatal error occurred in the IPC server: {e}", backtrace=True)
     finally:
         logger.info("Shutting down Aletheia IPC Server.")
-        socket.close()
+        command_socket.close()
+        telemetry_socket.close()
         context.term()
 
 if __name__ == "__main__":

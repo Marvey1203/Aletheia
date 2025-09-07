@@ -1,20 +1,48 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aletheia</title>
-    <!-- We will link our stylesheet here later if needed -->
+    <!-- This line is essential for the styles to apply -->
     <link rel="stylesheet" href="src/styles.css" />
   </head>
   <body>
-    <div class="container">
-      <h1>Chat</h1>
-      <div class="input-group">
-        <input id="query-input" type="text" placeholder="Ask Aletheia..." />
-        <button id="reason-button">Reason</button>
-      </div>
-      <div id="response-div">Awaiting query...</div>
+    <div id="chat-container">
+      <header id="chat-header">
+        <h1>Aletheia</h1>
+      </header>
+      
+      <main id="message-history">
+        <div class="message-container ai">
+          <div class="message-bubble">
+            <p>Hello! I am Aletheia. The stage is built. Let's begin.</p>
+          </div>
+        </div>
+      </main>
+
+      <footer id="chat-input-area">
+        <!-- This is the div the old HTML was missing -->
+        <div id="gear-selector">
+          <label title="Auto: Aletheia chooses the best reasoning depth.">
+            <input type="radio" name="gear" value="auto" checked> Auto
+          </label>
+          <label title="Gear 1: Direct, fast response for simple queries.">
+            <input type="radio" name="gear" value="gear_1"> G1
+          </label>
+          <label title="Gear 2: Standard, structured reasoning.">
+            <input type="radio" name="gear" value="gear_2"> G2
+          </label>
+          <label title="Gear 3: Deep, multi-expert analysis for complex problems.">
+            <input type="radio" name="gear" value="gear_3"> G3
+          </label>
+        </div>
+        <div id="input-form">
+          <textarea id="query-input" placeholder="Ask Aletheia..." rows="1"></textarea>
+          <button id="reason-button" title="Send message (Enter)">➤</button>
+        </div>
+      </footer>
     </div>
 
     <!-- This script tag must be at the end of the body -->
