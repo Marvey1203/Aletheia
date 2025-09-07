@@ -1,17 +1,16 @@
-// src/main.js
+// src/main.js (V2 - Orchestra Edition)
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; 
 import hljs from 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/es/highlight.min.js';
 
-// This listener ensures our script only runs after the HTML is fully loaded.
 window.addEventListener('DOMContentLoaded', () => {
     // --- DOM Element References ---
     const messageHistory = document.querySelector('#message-history');
     const queryInput = document.querySelector('#query-input');
     const reasonButton = document.querySelector('#reason-button');
-    const gearSelector = document.querySelector('#gear-selector'); // This will now be found.
+    const gearSelector = document.querySelector('#gear-selector');
 
     // --- Core Application Logic ---
 
@@ -19,16 +18,15 @@ window.addEventListener('DOMContentLoaded', () => {
         const query = queryInput.value.trim();
         if (!query) return;
 
-        const selectedGear = gearSelector.querySelector('input[name="gear"]:checked').value;
-        const gearOverride = selectedGear === 'auto' ? null : selectedGear;
+        const selectedGearValue = gearSelector.querySelector('input[name="gear"]:checked').value;
+        const gearOverride = selectedGearValue === 'auto' ? null : selectedGearValue;
 
+        // --- UI State Management ---
         queryInput.value = '';
-        queryInput.disabled = true;
-        reasonButton.disabled = true;
         autoResizeTextarea(queryInput);
+        setUIState(false, 'Sending...');
 
         appendMessage(query, 'user');
-
         const pendingBubble = appendMessage('...', 'ai');
         
         try {
@@ -39,10 +37,26 @@ window.addEventListener('DOMContentLoaded', () => {
                 const telemetry = JSON.parse(event.payload);
 
                 if (telemetry.query_id === query_id) {
+                    // --- Rich Telemetry Rendering ---
                     const bubbleContent = pendingBubble.querySelector('.message-content');
-
+                    
                     if (telemetry.type === 'stage_update') {
-                        bubbleContent.textContent = `${telemetry.stage.charAt(0).toUpperCase() + telemetry.stage.slice(1)}...`;
+                        // V2 UPGRADE: Display richer telemetry from the orchestra
+                        let stageText = telemetry.stage.charAt(0).toUpperCase() + telemetry.stage.slice(1);
+                        let detailText = '';
+
+                        if (telemetry.stage === 'triage' && telemetry.payload.pathway) {
+                            detailText = `Pathway selected: ${telemetry.payload.pathway.execution_model}`;
+                        } else if (telemetry.stage === 'plan') {
+                            detailText = `Sketching plan with ${telemetry.payload.initial_plan.length} steps...`;
+                        } else if (telemetry.stage === 'enrich') {
+                            detailText = `Refining plan with ${telemetry.payload.final_plan.length} detailed steps...`;
+                        } else if (telemetry.stage === 'execute') {
+                            detailText = 'Generating final answer...';
+                        }
+                        
+                        bubbleContent.innerHTML = `<span class="stage">${stageText}...</span><span class="detail">${detailText}</span>`;
+
                     } else if (telemetry.type === 'final_result') {
                         const trace = telemetry.payload;
                         
@@ -53,10 +67,12 @@ window.addEventListener('DOMContentLoaded', () => {
                             }
                         });
 
-                        bubbleContent.innerHTML = finalAnswerHtml;
+                        // Add a footer to the message with metadata
+                        const footer = `<footer class="message-footer">${trace.summary.reasoning}</footer>`;
+                        bubbleContent.innerHTML = finalAnswerHtml + footer;
                         
                         unlisten();
-                        enableUI();
+                        setUIState(true);
                     }
                 }
             });
@@ -65,7 +81,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const bubbleContent = pendingBubble.querySelector('.message-content');
             bubbleContent.innerHTML = `<span style="color: #ff8a8a;">${errorMessage}</span>`;
             console.error(errorMessage);
-            enableUI();
+            setUIState(true);
         }
     }
 
@@ -76,7 +92,6 @@ window.addEventListener('DOMContentLoaded', () => {
         const messageBubble = document.createElement('div');
         messageBubble.className = 'message-bubble';
         
-        // Use a dedicated div for content to make updates easier
         const content = document.createElement('div');
         content.className = 'message-content';
         content.textContent = text;
@@ -89,10 +104,13 @@ window.addEventListener('DOMContentLoaded', () => {
         return messageBubble;
     }
 
-    function enableUI() {
-        queryInput.disabled = false;
-        reasonButton.disabled = false;
-        queryInput.focus();
+    function setUIState(enabled, buttonText = '➤') {
+        queryInput.disabled = !enabled;
+        reasonButton.disabled = !enabled;
+        reasonButton.textContent = buttonText;
+        if (enabled) {
+            queryInput.focus();
+        }
     }
 
     function autoResizeTextarea(textarea) {
@@ -110,6 +128,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     queryInput.addEventListener('input', () => autoResizeTextarea(queryInput));
 
-    // Initial focus
-    queryInput.focus();
+    // Initial state
+    setUIState(true);
 });

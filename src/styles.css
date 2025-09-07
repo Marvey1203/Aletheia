@@ -166,3 +166,27 @@ body {
   background-color: transparent;
   padding: 0;
 }
+
+
+/* --- Rich Telemetry Styles --- */
+.message-content .stage {
+  display: block;
+  font-weight: bold;
+  color: #ccc;
+}
+.message-content .detail {
+  display: block;
+  font-size: 0.8em;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* --- Message Footer for Metadata --- */
+.message-footer {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.75em;
+  color: #aaa;
+  font-style: italic;
+}
