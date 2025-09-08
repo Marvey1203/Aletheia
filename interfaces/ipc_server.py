@@ -20,6 +20,7 @@ from core.memory import MemoryGalaxy
 from core.llm import ModelManager  # UPGRADED: Import ModelManager
 from core.atp import ATPLoopV3      # UPGRADED: Import ATPLoopV3
 from core.session import SessionManager
+from core.atlas import ConceptualAtlas  # Import the Atlas
 
 # --- Server Configuration ---
 COMMAND_ADDRESS = "tcp://127.0.0.1:5555"
@@ -45,15 +46,17 @@ def main(dummy_mode: bool = False):
         # UPGRADED: Instantiate the ModelManager
         model_manager = ModelManager(dummy_mode=dummy_mode)
         
-        # UPGRADED: Instantiate ATPLoopV3 with the ModelManager
+        atlas = ConceptualAtlas(model_manager=model_manager)
+        
         atp_loop = ATPLoopV3(
             identity=identity_core,
             memory=memory_galaxy,
             model_manager=model_manager
         )
         
-        session_manager = SessionManager()
-        logger.success("Aletheia Engine (V3) is awake and ready.")
+        # Pass the atlas instance to the SessionManager.
+        session_manager = SessionManager(atlas=atlas)
+        logger.success("Aletheia Engine (V3 with Atlas) is awake and ready.")
 
         # --- Initialize ZMQ Sockets ---
         context = zmq.Context()
@@ -69,6 +72,38 @@ def main(dummy_mode: bool = False):
         while True:
             command_json = command_socket.recv_json()
             logger.info(f"Received command: {command_json}")
+
+            if command_json.get("command") == "seed_memory":
+                texts = command_json.get("payload", {}).get("texts", [])
+                if texts:
+                    # Create dummy traces to seed the atlas
+                    for i, text in enumerate(texts):
+                        # We now import all the necessary schemas
+                        from core.schemas import Trace, Summary, Best, Reflection, ModelInfo
+                        from datetime import datetime, timezone
+                        
+                        # Create valid default objects for the required fields
+                        dummy_best = Best(attempt_id=0, candidate=text, total=0.0)
+                        dummy_reflection = Reflection(what_worked="Seeded memory.", what_failed="N/A", next_adjustment="N/A")
+                        dummy_model_info = ModelInfo(name="seed", runtime="system", temp=0.0)
+
+                        dummy_trace = Trace(
+                            trace_id=f"seed_{uuid.uuid4()}",
+                            query=f"Seeded Memory {i+1}",
+                            seed_id="eira-001",
+                            summary=Summary(answer=text, reasoning="Seeded from test script", next_action="N/A"),
+                            attempts=[], 
+                            # Pass the valid dummy objects instead of None
+                            best=dummy_best, 
+                            reflection=dummy_reflection, 
+                            model_info=dummy_model_info, 
+                            timestamp=datetime.now(timezone.utc).isoformat()
+                        )
+                        atlas.add_trace(dummy_trace)
+                    command_socket.send_json({"status": "success", "message": f"Seeded {len(texts)} memories."})
+                else:
+                    command_socket.send_json({"status": "error", "message": "No texts provided for seeding."})
+                continue
 
             if command_json.get("command") == "reason":
                 payload = command_json.get("payload", {})
@@ -107,6 +142,7 @@ def main(dummy_mode: bool = False):
                 )
                 
                 session_manager.add_trace_to_current_session(final_trace)
+                atlas.add_trace(final_trace)
 
                 final_message = {
                     "query_id": query_id,

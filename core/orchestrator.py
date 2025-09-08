@@ -1,6 +1,6 @@
-# core/orchestrator.py 
+# core/orchestrator.py (V2 - The Sentient Conductor)
 
-from typing import List, Dict
+from typing import List, Dict, Any
 import re
 from loguru import logger
 from pydantic import BaseModel
@@ -13,7 +13,6 @@ class CognitivePathway(BaseModel):
     Defines the "cognitive team" and strategy for a given query.
     This is the output of the Conductor.
     """
-    # FIX: Default models now match the roles in your models.json
     triage_model: str = "conductor_and_critic"
     plan_enrichment_model: str = "process_supervisor_4b"
     execution_model: str
@@ -24,45 +23,86 @@ class CognitivePathway(BaseModel):
 
 class Conductor:
     """
-    Analyzes a query and determines the optimal cognitive pathway.
+    Analyzes a query using an LLM to determine the optimal cognitive pathway.
     This is the "meta-mind" that orchestrates the orchestra.
     """
     def __init__(self, model_manager: ModelManager):
         self.model_manager = model_manager
+        # No longer need regex rules. The LLM is our router.
+        self._build_orchestra_menu()
+        logger.info("Conductor V2 (LLM-driven) initialized.")
+
+    def _build_orchestra_menu(self):
+        """Builds the 'menu' of available reasoners from the model roster."""
+        self.principal_reasoners = {}
+        # Dynamically find all models that are not the conductor or supervisor
+        for role, definition in self.model_manager.roster.items():
+            if "conductor" not in role and "supervisor" not in role:
+                self.principal_reasoners[role] = definition.notes
         
-        # --- FIX: Routing rules now map to the roles in your models.json ---
-        self.routing_rules: Dict[str, str] = {
-            r"\b(code|script|function|python|javascript|rust)\b": "specialist_coder_8b",
-            r"\b(story|poem|imagine|create|analyze|review)\b": "general_problem_solver_7b",
-            r"\b(plan|steps|process|how to)\b": "general_problem_solver_7b",
-        }
-        logger.info("Conductor initialized with rule-based routing.")
+        menu_items = [f"- {role}: {notes}" for role, notes in self.principal_reasoners.items()]
+        self.orchestra_menu = "\n".join(menu_items)
+        logger.info(f"Conductor built orchestra menu with {len(self.principal_reasoners)} reasoners.")
+
+    def _generate_routing_prompt(self, query: str) -> str:
+        """Constructs the prompt for the conductor model to make a routing decision."""
+        # V2 PROMPT: More context, clearer instructions, and "Chain of Thought"
+        return f"""You are the Conductor, a master of cognitive routing. Your task is to analyze the user's query and determine its fundamental INTENT. Do not be distracted by single keywords.
+
+            First, think step-by-step about the user's core goal. Is it technical and logical, or is it creative and philosophical?
+            Second, review your available musicians and their specialities.
+            Finally, choose the single best musician for the query's true intent.
+
+            **Orchestra Roster:**
+            {self.orchestra_menu}
+
+            **User Query:** "{query}"
+
+            **Chain of Thought Analysis:**
+            1.  **Core Intent:** (Analyze the user's intent here - e.g., "The user is asking for a personal opinion and a philosophical reflection on its own nature.")
+            2.  **Musician Analysis:** (Analyze which musician best fits the intent - e.g., "The 'general_problem_solver_7b' is best for open-ended, creative, and reasoning-based tasks.")
+            3.  **Final Selection:** (State the final choice)
+
+            **Selected Role:**"""
 
     def determine_cognitive_pathway(self, query: str) -> CognitivePathway:
         """
-        Applies a set of rules to the query to select the best models for the task.
+        Uses the conductor model to intelligently select the best execution model.
         """
-        logger.info("Conductor: Determining cognitive pathway...")
-        query_lower = query.lower()
+        logger.info("Conductor V2: Determining cognitive pathway via LLM...")
         
-        for pattern, role in self.routing_rules.items():
-            if re.search(pattern, query_lower):
-                notes = f"Query matched pattern '{pattern}'. Routing to specialist: {role}."
-                logger.info(notes)
-                return CognitivePathway(
-                    execution_model=role,
-                    notes=notes
-                )
+        routing_prompt = self._generate_routing_prompt(query)
+        
+        # Use our fast conductor model to make the decision
+        selected_role = self.model_manager.generate_text(
+            "conductor_and_critic",
+            routing_prompt,
+            max_tokens=20 # Just need the role name
+        ).strip()
 
-        # FIX: Default execution model now matches a role in your models.json
-        notes = "No specific rules matched. Defaulting to general problem solver."
-        logger.info(notes)
-        return CognitivePathway(
-            execution_model="general_problem_solver_7b",
-            notes=notes
-        )
+        # --- Validation and Fallback ---
+        # Clean up the model's output to get only the role name
+        # It might sometimes respond with "specialist_coder_8b." or similar.
+        clean_role = re.sub(r'[^a-zA-Z0-9_-]', '', selected_role.split('\n')[0]).strip()
 
-    def conduct_triage(self, query: str, gear_override: str = None) -> Dict:
+        if clean_role in self.principal_reasoners:
+            notes = f"Conductor selected '{clean_role}' based on semantic analysis of the query."
+            logger.success(notes)
+            return CognitivePathway(
+                execution_model=clean_role,
+                notes=notes
+            )
+        else:
+            # If the model hallucinates a role or fails, fall back to the default
+            default_role = "general_problem_solver_7b"
+            notes = f"Warning: Conductor LLM returned an invalid role ('{selected_role}'). Defaulting to '{default_role}'."
+            logger.warning(notes)
+            return CognitivePathway(
+                execution_model=default_role,
+                notes=notes
+            )
+
+    def conduct_triage(self, query: str, gear_override: str = None) -> Dict[str, Any]:
         """
         A simplified, rule-based triage for determining reasoning depth.
         """

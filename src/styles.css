@@ -190,3 +190,41 @@ body {
   color: #aaa;
   font-style: italic;
 }
+
+
+* --- Staging Indicator Structure --- */
+.stage-indicator {
+    min-height: 40px; /* Give it some space */
+}
+
+/* --- Retrieved Memories Display --- */
+.retrieved-memories {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.retrieved-memories h4 {
+    font-size: 0.8em;
+    color: var(--primary-accent);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.retrieved-memories ul {
+    list-style: none;
+    padding-left: 0;
+    font-size: 0.8em;
+    color: #bbb;
+}
+.retrieved-memories li {
+    padding-left: 1em;
+    text-indent: -1em;
+    margin-bottom: 0.3em;
+}
+.retrieved-memories li::before {
+    content: ' recollections - ';
+    color: #666;
+    padding-right: 0.5em;
+}

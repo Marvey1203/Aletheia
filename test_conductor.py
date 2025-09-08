@@ -1,4 +1,4 @@
-# test_conductor.py
+# test_conductor.py (V2 - With Memory Seeding)
 
 import zmq
 import json
@@ -17,6 +17,35 @@ TELEMETRY_ADDRESS = "tcp://localhost:5556"
 # --- Rich Console for pretty printing ---
 console = Console()
 
+def seed_memory(texts: list[str]):
+    """Sends a command to the server to seed the memory with sample texts."""
+    console.print(Panel("[bold yellow]Initiating Memory Seeding Run[/bold yellow]", border_style="yellow"))
+    
+    context = zmq.Context()
+    try:
+        req_socket = context.socket(zmq.REQ)
+        req_socket.connect(COMMAND_ADDRESS)
+
+        command = {
+            "command": "seed_memory",
+            "payload": {
+                "texts": texts
+            }
+        }
+        
+        console.print(f"[yellow]Sending seed command...[/yellow]")
+        req_socket.send_json(command)
+        
+        ack = req_socket.recv_json()
+        console.print(f"[green]Server Response:[/green] {json.dumps(ack, indent=2)}")
+
+    except Exception as e:
+        console.print(f"[bold red]An unexpected error occurred during seeding: {e}[/bold red]")
+    finally:
+        req_socket.close()
+        context.term()
+        console.print("\n[cyan]Seeding finished.[/cyan]")
+
 def run_test(query: str, gear_override: str = None):
     """
     Connects to the Aletheia IPC server, sends a command,
@@ -29,7 +58,6 @@ def run_test(query: str, gear_override: str = None):
 
     try:
         # --- 1. Send the Command ---
-        console.print("[yellow]Connecting to C2 server...[/yellow]")
         req_socket = context.socket(zmq.REQ)
         req_socket.connect(COMMAND_ADDRESS)
 
@@ -41,53 +69,35 @@ def run_test(query: str, gear_override: str = None):
             }
         }
         
-        console.print(f"[yellow]Sending command:[/yellow] {json.dumps(command, indent=2)}")
         req_socket.send_json(command)
-        
-        # Wait for acknowledgment
         ack = req_socket.recv_json()
-        console.print(f"[green]Received acknowledgment:[/green] {json.dumps(ack, indent=2)}")
         
         if ack.get("status") != "acknowledged":
-            console.print("[bold red]Error: Did not receive successful acknowledgment.[/bold red]")
+            console.print(f"[bold red]Error: Did not receive successful acknowledgment: {ack}[/bold red]")
             return
 
         query_id = ack.get("query_id")
-        if not query_id:
-            console.print("[bold red]Error: Acknowledgment did not contain a query_id.[/bold red]")
-            return
 
         # --- 2. Listen for Telemetry ---
-        console.print(f"\n[yellow]Connecting to Telemetry stream for query_id: [/yellow][bold]{query_id}[/bold]")
         sub_socket = context.socket(zmq.SUB)
         sub_socket.connect(TELEMETRY_ADDRESS)
         sub_socket.setsockopt_string(zmq.SUBSCRIBE, query_id)
-
-        # Set a timeout for receiving messages (e.g., 5 minutes)
         sub_socket.setsockopt(zmq.RCVTIMEO, 300000)
-
-        console.print("[green]Listener connected. Awaiting telemetry...[/green]\n")
 
         with Live(console=console, screen=False, auto_refresh=True) as live:
             while True:
                 try:
-                    # Receive topic and message
                     topic = sub_socket.recv_string()
                     message_json = sub_socket.recv_json()
                     
-                    panel_title = f"[bold]Telemetry Update for {topic}[/bold]"
-                    message_type = message_json.get('type')
-                    
-                    if message_type == "stage_update":
-                        panel_title = f"[bold]Stage: {message_json.get('stage', 'N/A').upper()}[/bold]"
-                    elif message_type == "final_result":
-                        panel_title = "[bold green]Final Trace Received[/bold green]"
-                    
-                    # Pretty print the JSON payload
+                    panel_title = f"[bold]Telemetry: {message_json.get('type', '').upper()}[/bold]"
+                    if message_json.get('type') == 'stage_update':
+                        panel_title += f" - [bold yellow]{message_json.get('stage', 'N/A').upper()}[/bold yellow]"
+
                     syntax = Syntax(json.dumps(message_json.get("payload"), indent=2), "json", theme="monokai", line_numbers=True)
                     live.update(Panel(syntax, title=panel_title, border_style="yellow"))
 
-                    if message_type == "final_result":
+                    if message_json.get('type') == "final_result":
                         console.print(Panel("[bold green]Test Run Complete. Final trace received.[/bold green]", border_style="green"))
                         break
                         
@@ -98,22 +108,29 @@ def run_test(query: str, gear_override: str = None):
     except Exception as e:
         console.print(f"[bold red]An unexpected error occurred: {e}[/bold red]")
     finally:
-        req_socket.close()
-        sub_socket.close()
+        if 'req_socket' in locals(): req_socket.close()
+        if 'sub_socket' in locals(): sub_socket.close()
         context.term()
         console.print("\n[cyan]Sockets closed. Test finished.[/cyan]")
 
 
 if __name__ == "__main__":
-    # Example of how to run the test from the command line:
-    # python test_conductor.py "What is the capital of France?"
-    # python test_conductor.py "Write a python script to list files" gear_3
-    
-    if len(sys.argv) < 2:
-        print("Usage: python test_conductor.py <query> [gear_override]")
+    if len(sys.argv) < 3:
+        print("Usage:")
+        print("  python test_conductor.py reason \"<query>\" [gear_override]")
+        print("  python test_conductor.py seed \"<text1>;<text2>;...\"")
         sys.exit(1)
         
-    test_query = sys.argv[1]
-    test_gear = sys.argv[2] if len(sys.argv) > 2 else None
+    command_type = sys.argv[1]
     
-    run_test(test_query, test_gear)
+    if command_type == "reason":
+        test_query = sys.argv[2]
+        test_gear = sys.argv[3] if len(sys.argv) > 3 else None
+        run_test(test_query, test_gear)
+    elif command_type == "seed":
+        # Use a semicolon to separate multiple texts to be seeded
+        seed_texts = sys.argv[2].split(';')
+        seed_memory(seed_texts)
+    else:
+        print(f"Unknown command: {command_type}")
+        sys.exit(1)

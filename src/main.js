@@ -1,4 +1,4 @@
-// src/main.js (V2 - Orchestra Edition)
+// src/main.js (V3 - Atlas Edition)
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -21,13 +21,12 @@ window.addEventListener('DOMContentLoaded', () => {
         const selectedGearValue = gearSelector.querySelector('input[name="gear"]:checked').value;
         const gearOverride = selectedGearValue === 'auto' ? null : selectedGearValue;
 
-        // --- UI State Management ---
         queryInput.value = '';
         autoResizeTextarea(queryInput);
         setUIState(false, 'Sending...');
 
         appendMessage(query, 'user');
-        const pendingBubble = appendMessage('...', 'ai');
+        const pendingBubble = appendMessage({ stage: 'Connecting', detail: 'Establishing link to Aletheia Core...' }, 'ai', true);
         
         try {
             const ack = await invoke('invoke_backend', { query, gearOverride });
@@ -37,25 +36,35 @@ window.addEventListener('DOMContentLoaded', () => {
                 const telemetry = JSON.parse(event.payload);
 
                 if (telemetry.query_id === query_id) {
-                    // --- Rich Telemetry Rendering ---
                     const bubbleContent = pendingBubble.querySelector('.message-content');
                     
                     if (telemetry.type === 'stage_update') {
-                        // V2 UPGRADE: Display richer telemetry from the orchestra
+                        // V3 UPGRADE: Handle the new, richer telemetry with memory context
                         let stageText = telemetry.stage.charAt(0).toUpperCase() + telemetry.stage.slice(1);
                         let detailText = '';
 
                         if (telemetry.stage === 'triage' && telemetry.payload.pathway) {
-                            detailText = `Pathway selected: ${telemetry.payload.pathway.execution_model}`;
-                        } else if (telemetry.stage === 'plan') {
-                            detailText = `Sketching plan with ${telemetry.payload.initial_plan.length} steps...`;
+                            const pathway = telemetry.payload.pathway;
+                            detailText = `Pathway selected: <strong>${pathway.execution_model}</strong>`;
+                            
+                            // Check for retrieved memories from the new context
+                            const context = telemetry.payload.context;
+                            if (context && context.long_term_memory && context.long_term_memory.length > 0) {
+                                let memoryHtml = '<div class="retrieved-memories"><h4>Recalling Relevant Memories...</h4><ul>';
+                                context.long_term_memory.forEach(mem => {
+                                    memoryHtml += `<li>${mem.answer.substring(0, 80)}...</li>`;
+                                });
+                                memoryHtml += '</ul></div>';
+                                pendingBubble.querySelector('.message-content').insertAdjacentHTML('afterbegin', memoryHtml);
+                            }
                         } else if (telemetry.stage === 'enrich') {
-                            detailText = `Refining plan with ${telemetry.payload.final_plan.length} detailed steps...`;
+                            detailText = `Refining plan with <strong>${telemetry.payload.final_plan.length}</strong> detailed steps...`;
                         } else if (telemetry.stage === 'execute') {
-                            detailText = 'Generating final answer...';
+                            detailText = `Generating final answer with <strong>${telemetry.payload.pathway.execution_model}</strong>...`;
                         }
                         
-                        bubbleContent.innerHTML = `<span class="stage">${stageText}...</span><span class="detail">${detailText}</span>`;
+                        bubbleContent.querySelector('.stage-indicator .stage').textContent = `${stageText}...`;
+                        if(detailText) bubbleContent.querySelector('.stage-indicator .detail').innerHTML = detailText;
 
                     } else if (telemetry.type === 'final_result') {
                         const trace = telemetry.payload;
@@ -67,9 +76,9 @@ window.addEventListener('DOMContentLoaded', () => {
                             }
                         });
 
-                        // Add a footer to the message with metadata
                         const footer = `<footer class="message-footer">${trace.summary.reasoning}</footer>`;
-                        bubbleContent.innerHTML = finalAnswerHtml + footer;
+                        // Replace the entire bubble content with the final answer and footer
+                        pendingBubble.innerHTML = finalAnswerHtml + footer;
                         
                         unlisten();
                         setUIState(true);
@@ -85,21 +94,25 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function appendMessage(text, sender) {
+    function appendMessage(content, sender, isPending = false) {
         const messageContainer = document.createElement('div');
         messageContainer.className = `message-container ${sender}`;
 
         const messageBubble = document.createElement('div');
         messageBubble.className = 'message-bubble';
         
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        content.textContent = text;
-        messageBubble.appendChild(content);
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
 
+        if (isPending) {
+            contentDiv.innerHTML = `<div class="stage-indicator"><span class="stage">${content.stage}...</span><span class="detail">${content.detail}</span></div>`;
+        } else {
+            contentDiv.textContent = content;
+        }
+        
+        messageBubble.appendChild(contentDiv);
         messageContainer.appendChild(messageBubble);
         messageHistory.appendChild(messageContainer);
-
         messageHistory.scrollTop = messageHistory.scrollHeight;
         return messageBubble;
     }
@@ -112,13 +125,13 @@ window.addEventListener('DOMContentLoaded', () => {
             queryInput.focus();
         }
     }
-
+    
     function autoResizeTextarea(textarea) {
         textarea.style.height = 'auto';
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-    // --- Event Listeners ---
+    // Event Listeners
     reasonButton.addEventListener('click', askAletheia);
     queryInput.addEventListener('keypress', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -128,6 +141,5 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     queryInput.addEventListener('input', () => autoResizeTextarea(queryInput));
 
-    // Initial state
     setUIState(true);
 });
