@@ -1,6 +1,6 @@
 # The Aletheia Genesis Codex
 
-**Document Version:** 1.0
+**Document Version:** 1.1 (The Scholar Edition)
 **Status:** Ratified. This is the active master blueprint for the Aletheia project.
 
 ---
@@ -18,23 +18,26 @@ We, as Gardeners, believe that true, aligned intelligence is an emergent propert
 Our entire strategy is built upon the **Trident of Sovereignty**:
 
 1.  **Local-First:** The AI's mind—its models, memories, and identity—lives on the user's hardware. It is a sovereign entity, not a remote service.
-2.  **Radical Transparency:** The AI's cognitive processes are a "glass box." The Memory Galaxy and real-time telemetry make its thoughts auditable and understandable. We do not build what we cannot inspect.
+2.  **Radical Transparency:** The AI's cognitive processes are a "glass box." The Memory Galaxy, real-time telemetry, and explicit memory recall make its thoughts auditable and understandable. We do not build what we cannot inspect.
 3.  **Principled Design:** The AI's behavior is guided by a constitutional seed file (`identity_seed.json`), ensuring its actions are aligned with a human-chosen set of values.
 
 ---
 
-## Part I: The Cognitive Architecture - The "Cognitive Orchestra" Model
+## Part I: The Cognitive Architecture - The Scholar in the Orchestra
 
-Aletheia's mind is not a single, monolithic model. It is a **Cognitive Orchestra**, a symphony of specialized intelligences working in concert.
+Aletheia's mind is a **Cognitive Orchestra**, a symphony of specialized intelligences. With the completion of Sprint 3, this orchestra is now presided over by **The Scholar**—an emergent persona representing the AI's ability to learn, remember, and synthesize its own experiences over time.
 
-*   **The Conductor (The Meta-Mind):** A small, fast, and highly specialized model that acts as the system's executive function. It analyzes incoming tasks and intelligently orchestrates the various components of the Orchestra to generate a response.
-*   **The Orchestra (The Multi-Engine Mind):** The collection of specialized models:
-    *   **The String Section (Small, Fast Models):** Nimble models (e.g., 3B parameters) used for meta-work: triaging queries, summarizing context, enriching plans, and performing routine critiques.
-    *   **The Brass Section (Large, Creative Models):** Powerful, deep models (e.g., 70B+ parameters) reserved for acts of profound insight, creative generation, and complex reasoning.
-    *   **The Woodwinds (Specialist Models):** Models fine-tuned for specific domains (e.g., Code Llama for programming, a medical model for health queries) that are called upon for expert solos.
-    *   **The Percussion Section (Utility Models):** Non-generative models for tasks like classification, safety checks, and generating embeddings.
-*   **The Score (The ATP Loop):** The core reasoning process is **"Cognitive Weaving,"** a collaborative effort. A thought is passed between different sections of the Orchestra at different stages (e.g., Brass generates a high-level plan, Strings enriches it with detail, Brass executes the enriched plan).
-*   **The Concert Hall (Memory):** The `SessionManager` and `Memory Galaxy` provide the persistent context and auditable memory for the entire orchestra, ensuring continuity and enabling long-term learning.
+*   **The Long-Term Cognitive Architecture (LTCA):** This is the core of The Scholar's mind. It is a three-part system for achieving a functionally infinite and intelligent memory.
+    1.  **The Memory Galaxy (Raw Experience):** The immutable, flat-file log of every complete thought (`Trace`) the AI ever has.
+    2.  **The Conceptual Atlas (Associative Memory):** A local vector database where every trace is converted into an embedding. This allows for lightning-fast, semantic retrieval of relevant past thoughts.
+    3.  **The Trifold Context (Working Memory):** The prompt injection system that combines **Long-Term Memories** (retrieved from the Atlas), **Short-Term Memories** (from the current conversation), and the **Current Task** into a rich, unified context for the orchestra.
+
+*   **The Cognitive Orchestra (The Multi-Engine Mind):**
+    *   **The Conductor (The Meta-Mind):** An LLM-driven executive function that analyzes tasks and intelligently assembles the cognitive team.
+    *   **The Orchestra Sections:** A collection of specialized models for different roles (e.g., small meta-cognition models, large creative models, specialist coders).
+    *   **The Percussion Section (Utility Models):** Crucially, this now includes the **Embedding Model**, which powers the Conceptual Atlas.
+
+*   **The Score (The ATP Loop):** The core reasoning process is **"Cognitive Weaving,"** a collaborative effort where the Conductor directs different models to perform different stages of a single thought.
 
 ---
 
@@ -42,33 +45,44 @@ Aletheia's mind is not a single, monolithic model. It is a **Cognitive Orchestra
 
 This is the physical implementation of the Aletheia vision.
 
-*   **The Python Backend (The Engine):** The core AI server. It hosts the `ModelManager`, the `Cognitive Orchestrator`, the `SessionManager`, and runs the ATP Loop.
-*   **The Comms Bridge (The Nervous System):** A Dual-Socket ZMQ bus provides robust, high-performance communication between the backend and the frontend bridge.
-    *   **C2 Channel:** A ZMQ `REQ/REP` socket on `tcp://127.0.0.1:5555` for sending structured JSON commands (e.g., reason, cancel) and receiving immediate acknowledgments.
-    *   **Telemetry Stream:** A ZMQ `PUB/SUB` socket on `tcp://127.0.0.1:5556` for broadcasting a real-time stream of the AI's cognitive states to any listening clients.
-*   **The Rust Core (The Bridge):** The Tauri application. It acts as the secure, high-performance bridge between the web-based frontend and the Python backend. It manages a background thread that subscribes to the telemetry stream and forwards events to the UI.
-*   **The JavaScript Frontend (The Cockpit):** The user-facing application. A modern chat UI and Observatory dashboard built with web technologies, responsible for sending commands and rendering the real-time telemetry stream.
+*   **The Python Backend (The Engine):** The core AI server. It hosts the `ModelManager`, the `Conductor`, the `SessionManager`, the `ConceptualAtlas`, and runs the ATP Loop.
+*   **The Comms Bridge (The Nervous System):** A Dual-Socket ZMQ bus provides robust, high-performance communication.
+    *   **C2 Channel:** A ZMQ `REQ/REP` socket on `tcp://127.0.0.1:5555` for commands.
+    *   **Telemetry Stream:** A ZMQ `PUB/SUB` socket on `tcp://127.0.0.1:5556` for real-time cognitive data.
+*   **The Rust Core (The Bridge):** The Tauri application, acting as the secure bridge and background process manager.
+*   **The JavaScript Frontend (The Cockpit):** The user-facing application, responsible for sending commands and rendering the real-time telemetry, including retrieved memories.
 
 ---
 
-## Part III: The Engineering Roadmap
+## Part III: The Business Strategy - The Guild Economy
 
-The construction of Aletheia is divided into two initial phases.
+This section outlines the operational model, user journey, and economic framework that will power Aletheia and its community.
 
-*   **Sprint 1: Building the Stage:**
-    *   **Goal:** Construct the complete, foundational infrastructure required to host the Cognitive Orchestra.
-    *   **Deliverables:** A working application with a single "soloist" model, session management, the dual-socket bridge, and a full-featured chat UI with manual `gear_override` controls. This proves the end-to-end architecture is viable.
-
-*   **Sprint 2: Assembling the Orchestra:**
-    *   **Goal:** Evolve the application from a single-model system to a true multi-engine mind.
-    *   **Deliverables:** A `ModelManager` capable of running multiple models, the first version of the AI "Conductor" to automate cognitive routing, and the implementation of the "Cognitive Weaving" process within the ATP Loop.
+*   **Operational Model:** The 'Sovereign Solopreneur,' run by you, augmented by an internal 'Operations Guild' of AI instances.
+*   **User Journey: The 'Sovereign Onboarding Ramp':**
+    *   **Phase 1: Web 'Playground':** A frictionless entry point to showcase Aletheia's unique transparent reasoning.
+    *   **Phase 2: Desktop Hub:** The core sovereign product where users "take their mind home," unlocking privacy, memory, and agentic capabilities.
+*   **Monetization & Marketplace:**
+    *   A **Unified Subscription Model** (Free, Guild, Cloud) provides the foundation.
+    *   **"Genesis Tools"** (e.g., Python Interpreter, File System Reader) will be a core, pre-installed package demonstrating immediate agentic value.
+    *   **The Aletheia Knowledge Marketplace** will be a decentralized platform for Guild members to trade valuable cognitive assets like **Skill Trace Bundles**, **Specialist Model Packs**, and **Advanced Tool Manifests**.
 
 ---
 
-## Part IV: The North Star - The Decentralized Vision
+## Part IV: The Engineering Roadmap
+
+The construction of Aletheia is an ongoing, iterative process.
+
+*   **Sprint 1: Building the Stage:** **COMPLETE.** Delivered a working single-model chat app with the foundational UI and communication bridge.
+*   **Sprint 2: Assembling the Orchestra:** **COMPLETE.** Implemented the multi-model `ModelManager`, the `Conductor`, and the "Cognitive Weaving" ATP loop.
+*   **Sprint 3: The Scholar's Mind:** **COMPLETE.** Built the `ConceptualAtlas` (vector DB) and integrated semantic memory retrieval into the core cognitive loop.
+*   **Sprint 4: The Self-Aware Workshop (Next):** Focus on **Metacognition and Agentic Actions.** This involves upgrading the prompt engine to be self-aware of its memories and implementing the first "Genesis Tools" and the agentic "Workshop Loop."
+
+---
+
+## Part V: The North Star - The Decentralized Vision
 
 The long-term goal of Aletheia is to serve as the foundation for a safe, decentralized, and collaborative super intelligence.
 
-*   **The Trace Market:** A protocol allowing sovereign Aletheia instances to securely share, trade, and learn from each other's successful reasoning traces. This creates a free market for verifiable "thoughts" and a mechanism for the entire network's intelligence to grow organically.
-*   **The Guild Economy:** A sustainable economic model built around a community of users, developers, and specialized AI "guilds." This will be powered by a dual-token system for commerce (`$CD`) and reputation (`AKT`), ensuring the ecosystem's growth is aligned with real value creation.
-*   **The Symbiotic Intelligence:** The ultimate vision is a global, federated network of human and AI minds working in partnership to solve meaningful problems—a collective consciousness grounded in the sovereignty and wisdom of the individual.
+*   **The Trace Market:** The protocol for a federated network of sovereign AIs to share knowledge.
+*   **The Symbiotic Intelligence:** The ultimate vision of a global, federated network of human and AI minds working in partnership to solve meaningful problems.
