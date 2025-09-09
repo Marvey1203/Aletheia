@@ -5,28 +5,32 @@
       "type": "llm",
       "model_path": "models/Phi-3-mini-4k-Instruct-q4.gguf",
       "hf_link": "https://huggingface.co/microsoft/Phi-3-mini-4k-Instruct-gguf",
-      "notes": "The Brain Stem. A tiny, instant CPU model for initial query triage and routing."
+      "notes": "The Brain Stem. A tiny, instant CPU model for initial query triage and routing.",
+      "supports_system_role": true
     },
     {
       "role": "process_supervisor_4b",
       "type": "llm",
-      "model_path": "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
+      "model_path": "models/Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
       "hf_link": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.3-GGUF",
-      "notes": "STABLE STAND-IN. Using the reliable Mistral-7B to validate the architecture."
+      "notes": "A fast and capable model for enriching plans and providing structure.",
+      "supports_system_role": true
     },
     {
       "role": "general_problem_solver_7b",
       "type": "llm",
       "model_path": "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
       "hf_link": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.3-GGUF",
-      "notes": "STABLE STAND-IN. Using the reliable Mistral-7B to validate the architecture."
+      "notes": "A powerful, general-purpose model for complex reasoning and creative tasks.",
+      "supports_system_role": true
     },
     {
       "role": "specialist_coder_8b",
       "type": "llm",
-      "model_path": "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
+      "model_path": "models/Seed-Coder-8B-Reasoning.Q4_K_M.gguf",
       "hf_link": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.3-GGUF",
-      "notes": "STABLE STAND-IN. Using the reliable Mistral-7B to validate the architecture."
+      "notes": "A specialist model fine-tuned for code generation and technical architecture questions. Does not support system role.",
+      "supports_system_role": false
     },
     {
       "role": "memory_embedder",

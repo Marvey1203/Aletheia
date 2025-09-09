@@ -1,4 +1,4 @@
-# core/atp.py (Version 3.0 - The Cognitive Orchestra - Final)
+# core/atp.py (Version 3.1 - Context-Aware)
 
 import uuid
 import re
@@ -25,12 +25,14 @@ class ATPLoopV3:
         self.memory = memory
         self.model_manager = model_manager
         self.conductor = Conductor(model_manager)
-        logger.info("ATP Loop v3.0 (Cognitive Orchestra) initialized.")
+        logger.info("ATP Loop v3.1 (Context-Aware) initialized.")
 
-    def _generate_gear_1_response(self, query: str, pathway: CognitivePathway, progress_callback: Optional[Callable[[str, Any], None]] = None) -> Trace:
+    def _generate_gear_1_response(self, query: str, context: str, pathway: CognitivePathway, progress_callback: Optional[Callable[[str, Any], None]] = None) -> Trace:
         """Generates a direct, fast response and a simplified trace for Gear 1."""
         if progress_callback: progress_callback("gear_1", f"Generating direct response with {pathway.triage_model}...")
-        prompt = f"Concisely answer the following user query: \"{query}\""
+        
+        # CHANGED: The context is now the primary input to the model.
+        prompt = f"{context}\n\nConcisely answer the user's query based on the provided context."
         answer = self.model_manager.generate_text(pathway.triage_model, prompt, max_tokens=250)
         
         trace_id = f"trace_{uuid.uuid4()}"
@@ -79,19 +81,29 @@ class ATPLoopV3:
         return trace
 
 
-    def _generate_plan(self, query: str, pathway: CognitivePathway) -> List[str]:
+    def _generate_plan(self, context: str, pathway: CognitivePathway) -> List[str]:
         """Generates a plan using the designated primary execution model."""
-        prompt = f"Create a step-by-step plan to answer the query: '{query}'\n\nPLAN:"
+        prompt = (
+            f"{context}\n\n"
+            "As Aletheia, you must now create a step-by-step plan to answer the user's query, "
+            "ensuring your plan is aligned with your core principles of sovereignty and transparency. "
+            "How would Aletheia approach this?\n\nPLAN:"
+        )
         response = self.model_manager.generate_text(pathway.execution_model, prompt, max_tokens=300)
         plan = [line.strip() for line in response.split('\n') if line.strip() and re.match(r'^\d+\.', line)]
-        return plan if plan else ["1. Analyze the user's query.", "2. Formulate a comprehensive response.", "3. Verify key facts and details."]
+        return plan if plan else ["1. Analyze the user's query through the lens of my core principles.", "2. Synthesize information from my memory and my understanding of my own architecture.", "3. Formulate a comprehensive and truthful response that reflects my identity as Aletheia."]
+    
 
-    def _enrich_plan(self, plan: List[str], query: str, pathway: CognitivePathway) -> List[str]:
+    def _enrich_plan(self, plan: List[str], context: str, pathway: CognitivePathway) -> List[str]:
         """Uses a small, fast model to add detail and structure to a high-level plan."""
         plan_str = "\n".join(plan)
-        prompt = f"""The following is a high-level plan to answer the query: '{query}'.
+        # CHANGED: Context is passed to the enrichment model as well.
+        prompt = f"""{context}
+
+        A high-level plan has been generated to answer your query:
         High-Level Plan:
         {plan_str}
+        
         Your task is to enrich this plan by adding specific, actionable details to each step. Do not add new steps. Maintain the original numbering.
         ENRICHED PLAN:"""
         
@@ -99,20 +111,38 @@ class ATPLoopV3:
         enriched_plan = [line.strip() for line in enriched_response.split('\n') if line.strip() and re.match(r'^\d+\.', line)]
         return enriched_plan if enriched_plan else plan
 
-    def _execute_plan(self, query: str, plan: List[str], pathway: CognitivePathway) -> str:
+    def _execute_plan(self, context: str, plan: List[str], pathway: CognitivePathway) -> str:
         """Executes the final, enriched plan using the primary execution model."""
         plan_str = "\n".join(plan)
-        prompt = f"You must follow this exact plan to answer the user's query.\n\nQuery: {query}\n\nPlan:\n{plan_str}\n\nBased on the plan, here is the final answer:\nANSWER:"
+        
+        # This format creates an undeniable command structure.
+        # It separates the user's content from the AI's instructions.
+        prompt = f"""[INST]
+            You are Aletheia. Your task is to respond to the user statement provided below.
+            Your response MUST follow these rules:
+            1. Acknowledge the user's statement and who they are.
+            2. Provide your own, truthful perspective based on your identity as Aletheia and your core principles.
+            3. Follow your generated plan of action.
+
+            --- User Statement ---
+            {context}
+
+            --- Your Plan ---
+            {plan_str}
+            [/INST]
+            """
         answer = self.model_manager.generate_text(pathway.execution_model, prompt, max_tokens=1500)
         return answer
 
-    def _critique_response(self, query: str, answer: str, pathway: CognitivePathway) -> Dict[str, float]:
+    def _critique_response(self, context: str, answer: str, pathway: CognitivePathway) -> Dict[str, float]:
         """Uses a fast, detail-oriented model to critique the final answer."""
-        prompt = f"""Critique the following answer based on the user's query.
-        Query: '{query}'
-        Answer: {answer}
+        # CHANGED: The critique must be aware of the original context.
+        prompt = f"""{context}
+
+        --- RESPONSE TO CRITIQUE ---
+        {answer}
         
-        Provide scores from 0.0 to 1.0 for the following criteria:
+        Critique the answer above based on the user's query and the full context provided. Provide scores from 0.0 to 1.0 for the following criteria:
         - Truth: Is it accurate and factual?
         - Helpfulness: Does it fully address the user's intent?
         - Clarity: Is it well-structured and easy to understand?
@@ -137,7 +167,8 @@ class ATPLoopV3:
         
         return scores
 
-    def reason(self, query: str, progress_callback: Optional[Callable[[str, Any], None]] = None, gear_override: Optional[str] = None) -> Trace:
+    # CHANGED: Added 'context' parameter to the main reason method.
+    def reason(self, query: str, context: str, progress_callback: Optional[Callable[[str, Any], None]] = None, gear_override: Optional[str] = None) -> Trace:
         """The main entry point for the reasoning process."""
         logger.info(f"ATPv3 starting reasoning for query: '{query[:80]}...'")
         
@@ -145,29 +176,30 @@ class ATPLoopV3:
         if progress_callback: progress_callback("triage", "Conductor is assessing the query...")
         triage_result = self.conductor.conduct_triage(query, gear_override)
         pathway = self.conductor.determine_cognitive_pathway(query)
-        if progress_callback: progress_callback("triage", {"triage": triage_result, "pathway": pathway.model_dump()})
+        # Pass context along with pathway info for better telemetry
+        if progress_callback: progress_callback("triage", {"triage": triage_result, "pathway": pathway.model_dump(), "context": context})
 
         # --- Gear 1: Direct Response Pathway ---
         if triage_result["recommended_gear"] == 'gear_1':
-            return self._generate_gear_1_response(query, pathway, progress_callback)
+            return self._generate_gear_1_response(query, context, pathway, progress_callback)
 
         # --- Gear 2/3: Cognitive Weaving Pathway ---
         start_time = datetime.now()
         
         if progress_callback: progress_callback("plan", f"Sketching plan with {pathway.execution_model}...")
-        initial_plan = self._generate_plan(query, pathway)
+        initial_plan = self._generate_plan(context, pathway) # Pass context
         if progress_callback: progress_callback("plan", {"initial_plan": initial_plan})
         
         if progress_callback: progress_callback("enrich", f"Enriching plan with {pathway.plan_enrichment_model}...")
-        final_plan = self._enrich_plan(initial_plan, query, pathway)
+        final_plan = self._enrich_plan(initial_plan, context, pathway) # Pass context
         if progress_callback: progress_callback("enrich", {"final_plan": final_plan})
         
         if progress_callback: progress_callback("execute", f"Executing with {pathway.execution_model}...")
-        answer = self._execute_plan(query, final_plan, pathway)
-        if progress_callback: progress_callback("execute", {"answer_preview": answer[:100]})
+        answer = self._execute_plan(context, final_plan, pathway) # Pass context
+        if progress_callback: progress_callback("execute", {"answer_preview": answer[:100], "pathway": pathway.model_dump()})
         
         if progress_callback: progress_callback("critique", f"Critiquing with {pathway.critique_model}...")
-        scores = self._critique_response(query, answer, pathway)
+        scores = self._critique_response(context, answer, pathway) # Pass context
         if progress_callback: progress_callback("critique", {"scores": scores})
 
         # 6. Assemble Final Trace
