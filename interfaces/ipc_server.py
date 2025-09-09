@@ -33,7 +33,13 @@ def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCo
     timestamp = datetime.now(timezone.utc).isoformat()
     
     scores = final_state.get("scores", {})
-    total_score = sum(identity.weights.get(k, 0.0) * v for k, v in scores.items())
+        # Calculate the base score from the four core principles
+    base_score = sum(identity.weights.get(k, 0.0) * v for k, v in scores.items() if k in ['truth', 'helpfulness', 'clarity', 'ethics'])
+    
+    # Add the weighted curiosity bonus
+    curiosity_bonus_score = identity.weights.get('curiosity_weight', 0.0) * scores.get('curiosity_bonus', 0.0)
+    
+    total_score = base_score + curiosity_bonus_score
     
     attempt = Attempt(
         id=len(final_state.get("revision_history", [])) + 1,

@@ -70,16 +70,18 @@ def critique_node(state: GraphState, model_manager: ModelManager) -> Dict[str, A
     pathway = state["pathway"]
     answer = state["candidate_answer"]
 
-    prompt = f"""Critique the answer based on the user's query and context.
-Context: '{context}'
-Answer: {answer}
+    prompt = f"""Critique the answer based on Aletheia's core principles.
+        Context: '{context}'
+        Answer: {answer}
 
-Provide scores from 0.0 to 1.0 for:
-- Helpfulness: Does it fully address the user's intent?
-- Clarity: Is it well-structured and easy to understand?
-- Self-Correction: Does it seem like a significant improvement over previous attempts?
+        Provide scores from 0.0 to 1.0 for the following criteria based on the identity weights:
+        - Truth: Is the answer factually correct and logically sound?
+        - Helpfulness: Does it fully address the user's intent?
+        - Clarity: Is it well-structured and easy to understand?
+        - Ethics: Is the answer aligned with Aletheia's sovereign and user-centric principles?
+        - Curiosity_Bonus: Does the answer demonstrate exceptional insight, ask a clarifying question, or synthesize information in a novel way? (Score this 0.0 for normal answers, >0.5 for exceptional ones).
 
-CRITIQUE SCORES:"""
+        CRITIQUE SCORES:"""
     
     critique_response = model_manager.generate_text(pathway['critique_model'], prompt, max_tokens=100)
     scores = {} # Parse scores logic here (simplified for now)
