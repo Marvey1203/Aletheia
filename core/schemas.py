@@ -4,7 +4,7 @@
 # (Version 2.0 - Recursive Traces for Polymath Protocol)
 
 from __future__ import annotations
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TypedDict
 from pydantic import BaseModel, Field, ConfigDict
 
 class ToolCall(BaseModel):
@@ -58,3 +58,20 @@ class Trace(BaseModel):
     persona_id: Optional[str] = None # e.g., "Architect", "Critic", "Arbiter"
     sub_traces: Optional[List[Trace]] = None # The recursive part!
 
+
+class GraphState(TypedDict):
+    """
+    Represents the state of our cognitive graph.
+    Passed between nodes, accumulating information.
+    """
+    query: str
+    context: str
+    
+    # These keys are added during the graph's execution, so they are optional.
+    pathway: Optional[Dict[str, Any]]
+    plan: Optional[List[str]]
+    candidate_answer: Optional[str]
+    scores: Optional[Dict[str, float]]
+    
+    # This key is present from the start.
+    revision_history: List[str]

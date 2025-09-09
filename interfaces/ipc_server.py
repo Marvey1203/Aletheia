@@ -1,13 +1,14 @@
-# interfaces/ipc_server.py (V3.1 - Context-Aware)
+# interfaces/ipc_server.py (V4.3 - Final State Correction)
 
 import sys
 import zmq
 import json
 import uuid
 from pathlib import Path
+from datetime import datetime, timezone
+from typing import Dict, Any
 
 from loguru import logger
-from pydantic import BaseModel
 
 # --- Add project root to the Python path for correct module imports ---
 project_root = str(Path(__file__).resolve().parent.parent)
@@ -18,127 +19,125 @@ if project_root not in sys.path:
 from core.identity import IdentityCore
 from core.memory import MemoryGalaxy
 from core.llm import ModelManager
-from core.atp import ATPLoopV3
+from core.orchestrator import Conductor
 from core.session import SessionManager
 from core.atlas import ConceptualAtlas
+from core.agent import build_cognitive_graph
+from core.schemas import Trace, Summary, Attempt, Best, Reflection, ModelInfo, GraphState
 
-# --- Server Configuration ---
-COMMAND_ADDRESS = "tcp://127.0.0.1:5555"
-TELEMETRY_ADDRESS = "tcp://127.0.0.1:5556"
+def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCore) -> Trace:
+    """Maps the final state of the cognitive graph to a formal Trace object."""
+    logger.info("Mapping final graph state to Trace object...")
+    
+    trace_id = f"trace_{uuid.uuid4()}"
+    timestamp = datetime.now(timezone.utc).isoformat()
+    
+    scores = final_state.get("scores", {})
+    total_score = sum(identity.weights.get(k, 0.0) * v for k, v in scores.items())
+    
+    attempt = Attempt(
+        id=len(final_state.get("revision_history", [])) + 1,
+        plan=final_state.get("plan", []),
+        candidate=final_state.get("candidate_answer", "Error: No answer in final state."),
+        scores=scores,
+        total=total_score
+    )
+
+    summary = Summary(
+        answer=attempt.candidate,
+        reasoning=f"Generated via Cognitive Graph. Final Reasoner: {final_state.get('pathway', {}).get('execution_model')}",
+        next_action="Awaiting next user query."
+    )
+    
+    best = Best(attempt_id=attempt.id, candidate=attempt.candidate, total=attempt.total)
+    
+    reflection = Reflection(
+        what_worked="The graph-based reasoning process allowed for potential self-correction and a structured cognitive flow.",
+        what_failed="The system must ensure that all nodes handle errors gracefully to prevent graph execution failure.",
+        next_adjustment="Continue to refine the conditional logic and nodes for more complex tasks like tool use."
+    )
+    
+    model_info = ModelInfo(
+        name=f"Orchestra: {final_state.get('pathway', {}).get('execution_model')}",
+        runtime="local",
+        temp=0.2
+    )
+
+    trace = Trace(
+        trace_id=trace_id,
+        query=final_state["query"],
+        seed_id=identity.seed_id,
+        summary=summary,
+        attempts=[attempt],
+        best=best,
+        reflection=reflection,
+        model_info=model_info,
+        timestamp=timestamp
+    )
+    logger.success(f"Successfully created Trace {trace.trace_id} from graph state.")
+    return trace
 
 def main(dummy_mode: bool = False):
-    """
-    The main function for the Aletheia IPC server.
-    Initializes the AI engine and manages the dual-socket communication.
-    """
     logger.remove()
     logger.add(sys.stdout, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
-    logger.info("==========================================================")
-    logger.info("Aletheia IPC Server (Cognitive Orchestra Edition) Initializing...")
-    logger.info(f"Dummy Mode: {dummy_mode}")
-    logger.info("==========================================================")
+    logger.info("Aletheia IPC Server (V4.3 - Final) Initializing...")
 
     try:
-        # --- Initialize AI Engine Components ---
         identity_core = IdentityCore()
         memory_galaxy = MemoryGalaxy()
-        
-        # CHANGED: ModelManager now requires the identity_core for system prompts.
         model_manager = ModelManager(identity=identity_core, dummy_mode=dummy_mode)
-        
         atlas = ConceptualAtlas(model_manager=model_manager)
-        
-        atp_loop = ATPLoopV3(
-            identity=identity_core,
-            memory=memory_galaxy,
-            model_manager=model_manager
-        )
-        
+        conductor = Conductor(model_manager=model_manager)
         session_manager = SessionManager(atlas=atlas)
-        logger.success("Aletheia Engine (V3.1 with Identity) is awake and ready.")
+        cognitive_app = build_cognitive_graph(identity_core, model_manager, conductor)
+        logger.success("Aletheia Engine (V4.3) is compiled and ready.")
 
-        # --- Initialize ZMQ Sockets ---
         context = zmq.Context()
         command_socket = context.socket(zmq.REP)
-        command_socket.bind(COMMAND_ADDRESS)
-        logger.success(f"C2 server is bound and listening on {COMMAND_ADDRESS}")
-        
+        command_socket.bind("tcp://127.0.0.1:5555")
         telemetry_socket = context.socket(zmq.PUB)
-        telemetry_socket.bind(TELEMETRY_ADDRESS)
-        logger.success(f"Telemetry publisher is bound on {TELEMETRY_ADDRESS}")
+        telemetry_socket.bind("tcp://127.0.0.1:5556")
 
-        # --- Main Server Loop ---
         while True:
             command_json = command_socket.recv_json()
-            logger.info(f"Received command: {command_json}")
-
-            if command_json.get("command") == "seed_memory":
-                texts = command_json.get("payload", {}).get("texts", [])
-                if texts:
-                    from core.schemas import Trace, Summary, Best, Reflection, ModelInfo
-                    from datetime import datetime, timezone
-                    
-                    for i, text in enumerate(texts):
-                        dummy_best = Best(attempt_id=0, candidate=text, total=0.0)
-                        dummy_reflection = Reflection(what_worked="Seeded memory.", what_failed="N/A", next_adjustment="N/A")
-                        dummy_model_info = ModelInfo(name="seed", runtime="system", temp=0.0)
-
-                        dummy_trace = Trace(
-                            trace_id=f"seed_{uuid.uuid4()}",
-                            query=f"Seeded Memory {i+1}",
-                            seed_id="eira-001",
-                            summary=Summary(answer=text, reasoning="Seeded from test script", next_action="N/A"),
-                            attempts=[], 
-                            best=dummy_best, 
-                            reflection=dummy_reflection, 
-                            model_info=dummy_model_info, 
-                            timestamp=datetime.now(timezone.utc).isoformat()
-                        )
-                        atlas.add_trace(dummy_trace)
-                    command_socket.send_json({"status": "success", "message": f"Seeded {len(texts)} memories."})
-                else:
-                    command_socket.send_json({"status": "error", "message": "No texts provided for seeding."})
-                continue
 
             if command_json.get("command") == "reason":
                 payload = command_json.get("payload", {})
                 query = payload.get("query")
-                gear_override = payload.get("gear_override")
-                
                 if not query:
                     command_socket.send_json({"status": "error", "message": "No query provided."})
                     continue
-
+                
                 query_id = f"query_{uuid.uuid4()}"
                 command_socket.send_json({"status": "acknowledged", "query_id": query_id})
 
-                def progress_callback(stage: str, result: any):
-                    payload_data = result
-                    if isinstance(result, BaseModel):
-                        payload_data = result.model_dump()
-                    
-                    telemetry_message = {
-                        "query_id": query_id,
-                        "type": "stage_update",
-                        "stage": stage,
-                        "payload": payload_data
-                    }
+                context_string = session_manager.generate_trifold_context(query)
+                initial_state = {"query": query, "context": context_string, "revision_history": []}
+
+                # --- CORRECTED STATE HANDLING LOGIC ---
+
+                # Step 1: Use stream() for real-time telemetry to the UI.
+                # We don't need to capture the state here anymore.
+                for chunk in cognitive_app.stream(initial_state):
+                    node_name, node_output = list(chunk.items())[0]
+                    telemetry_message = { "query_id": query_id, "type": "stage_update", "stage": node_name, "payload": node_output }
                     telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
                     telemetry_socket.send_json(telemetry_message)
-                    logger.info(f"Published telemetry for {query_id}: Stage {stage}")
-
-                context_string = session_manager.generate_trifold_context(query)
-
-                # CHANGED: The generated context_string is now passed to the ATP loop.
-                # This is the fix for the "Amnesia" problem.
-                final_trace = atp_loop.reason(
-                    query, 
-                    context=context_string,
-                    progress_callback=progress_callback, 
-                    gear_override=gear_override
-                )
+                    logger.info(f"Published telemetry for {query_id}: Node '{node_name}' completed.")
                 
+                # Step 2: After the stream is done, use invoke() to get the single,
+                # complete, and guaranteed final state of the graph.
+                logger.info("Graph streaming complete. Invoking for final state...")
+                final_state = cognitive_app.invoke(initial_state)
+                logger.info(f"Graph invocation complete. Final state keys: {final_state.keys()}")
+                
+                # Step 3: Now we can safely create the trace from the complete final state.
+                final_trace = _create_trace_from_final_state(final_state, identity_core)
+                
+                # --- END OF CORRECTION ---
+
                 session_manager.add_trace_to_current_session(final_trace)
+                memory_galaxy.save_trace(final_trace)
                 atlas.add_trace(final_trace)
 
                 final_message = {
@@ -148,7 +147,7 @@ def main(dummy_mode: bool = False):
                 }
                 telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
                 telemetry_socket.send_json(final_message)
-                logger.success(f"Published final trace for {query_id}")
+                logger.success(f"Published and saved final trace {final_trace.trace_id} for {query_id}")
 
             else:
                 command_socket.send_json({"status": "error", "message": "Unknown command"})
