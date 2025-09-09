@@ -28,40 +28,37 @@ class Conductor:
     """
     def __init__(self, model_manager: ModelManager):
         self.model_manager = model_manager
-        # No longer need regex rules. The LLM is our router.
         self._build_orchestra_menu()
-        logger.info("Conductor V2 (LLM-driven) initialized.")
+        logger.info("Conductor V2.1 (Hardened) initialized.")
 
     def _build_orchestra_menu(self):
         """Builds the 'menu' of available reasoners from the model roster."""
         self.principal_reasoners = {}
-        # Dynamically find all models that are not the conductor or supervisor
         for role, definition in self.model_manager.roster.items():
-            if "conductor" not in role and "supervisor" not in role:
+            # This 'if' statement now has the crucial extra condition.
+            if (definition.type == 'llm' and
+                    "conductor" not in role and
+                    "supervisor" not in role):
                 self.principal_reasoners[role] = definition.notes
         
         menu_items = [f"- {role}: {notes}" for role, notes in self.principal_reasoners.items()]
         self.orchestra_menu = "\n".join(menu_items)
-        logger.info(f"Conductor built orchestra menu with {len(self.principal_reasoners)} reasoners.")
+        logger.success(f"Conductor built a VALIDATED orchestra menu with {len(self.principal_reasoners)} reasoners.")
 
+    # CHANGED: The prompt is now much more direct about the required output format.
     def _generate_routing_prompt(self, query: str) -> str:
         """Constructs the prompt for the conductor model to make a routing decision."""
-        # V2 PROMPT: More context, clearer instructions, and "Chain of Thought"
-        return f"""You are the Conductor, a master of cognitive routing. Your task is to analyze the user's query and determine its fundamental INTENT. Do not be distracted by single keywords.
-
-            First, think step-by-step about the user's core goal. Is it technical and logical, or is it creative and philosophical?
-            Second, review your available musicians and their specialities.
-            Finally, choose the single best musician for the query's true intent.
+        return f"""You are the Conductor, a master of cognitive routing. Your task is to analyze the user's query and choose the single best musician from the orchestra roster to handle it.
 
             **Orchestra Roster:**
             {self.orchestra_menu}
 
             **User Query:** "{query}"
 
-            **Chain of Thought Analysis:**
-            1.  **Core Intent:** (Analyze the user's intent here - e.g., "The user is asking for a personal opinion and a philosophical reflection on its own nature.")
-            2.  **Musician Analysis:** (Analyze which musician best fits the intent - e.g., "The 'general_problem_solver_7b' is best for open-ended, creative, and reasoning-based tasks.")
-            3.  **Final Selection:** (State the final choice)
+            **Analysis:** First, think step-by-step about the user's core intent. Then, from the roster, select the single best role.
+            
+            **Your Final Answer MUST be ONLY the role name and nothing else.**
+            For example: general_problem_solver_7b
 
             **Selected Role:**"""
 
@@ -69,33 +66,37 @@ class Conductor:
         """
         Uses the conductor model to intelligently select the best execution model.
         """
-        logger.info("Conductor V2: Determining cognitive pathway via LLM...")
+        logger.info("Conductor V2.1: Determining cognitive pathway via LLM...")
         
         routing_prompt = self._generate_routing_prompt(query)
         
-        # Use our fast conductor model to make the decision
-        selected_role = self.model_manager.generate_text(
+        selected_role_output = self.model_manager.generate_text(
             "conductor_and_critic",
             routing_prompt,
-            max_tokens=20 # Just need the role name
+            max_tokens=50 # Increased slightly to allow for some "thought" before the answer
         ).strip()
 
-        # --- Validation and Fallback ---
-        # Clean up the model's output to get only the role name
-        # It might sometimes respond with "specialist_coder_8b." or similar.
-        clean_role = re.sub(r'[^a-zA-Z0-9_-]', '', selected_role.split('\n')[0]).strip()
+        # --- CHANGED: More robust parsing logic ---
+        # Instead of just cleaning the string, we actively search for a valid role within it.
+        # This makes the system resilient even if the model adds extra text.
+        
+        # Check for the best match in the model's output
+        found_role = None
+        for role_name in self.principal_reasoners.keys():
+            if role_name in selected_role_output:
+                found_role = role_name
+                break # Stop at the first match
 
-        if clean_role in self.principal_reasoners:
-            notes = f"Conductor selected '{clean_role}' based on semantic analysis of the query."
+        if found_role:
+            notes = f"Conductor selected '{found_role}' based on semantic analysis of the query."
             logger.success(notes)
             return CognitivePathway(
-                execution_model=clean_role,
+                execution_model=found_role,
                 notes=notes
             )
         else:
-            # If the model hallucinates a role or fails, fall back to the default
             default_role = "general_problem_solver_7b"
-            notes = f"Warning: Conductor LLM returned an invalid role ('{selected_role}'). Defaulting to '{default_role}'."
+            notes = f"Warning: Conductor LLM returned an ambiguous response ('{selected_role_output}'). Defaulting to '{default_role}'."
             logger.warning(notes)
             return CognitivePathway(
                 execution_model=default_role,

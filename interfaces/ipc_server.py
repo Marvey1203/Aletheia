@@ -1,4 +1,4 @@
-# interfaces/ipc_server.py (V3 - Integrated with Cognitive Orchestra)
+# interfaces/ipc_server.py (V3.1 - Context-Aware)
 
 import sys
 import zmq
@@ -17,10 +17,10 @@ if project_root not in sys.path:
 # --- Import Core Aletheia Components ---
 from core.identity import IdentityCore
 from core.memory import MemoryGalaxy
-from core.llm import ModelManager  # UPGRADED: Import ModelManager
-from core.atp import ATPLoopV3      # UPGRADED: Import ATPLoopV3
+from core.llm import ModelManager
+from core.atp import ATPLoopV3
 from core.session import SessionManager
-from core.atlas import ConceptualAtlas  # Import the Atlas
+from core.atlas import ConceptualAtlas
 
 # --- Server Configuration ---
 COMMAND_ADDRESS = "tcp://127.0.0.1:5555"
@@ -43,8 +43,8 @@ def main(dummy_mode: bool = False):
         identity_core = IdentityCore()
         memory_galaxy = MemoryGalaxy()
         
-        # UPGRADED: Instantiate the ModelManager
-        model_manager = ModelManager(dummy_mode=dummy_mode)
+        # CHANGED: ModelManager now requires the identity_core for system prompts.
+        model_manager = ModelManager(identity=identity_core, dummy_mode=dummy_mode)
         
         atlas = ConceptualAtlas(model_manager=model_manager)
         
@@ -54,9 +54,8 @@ def main(dummy_mode: bool = False):
             model_manager=model_manager
         )
         
-        # Pass the atlas instance to the SessionManager.
         session_manager = SessionManager(atlas=atlas)
-        logger.success("Aletheia Engine (V3 with Atlas) is awake and ready.")
+        logger.success("Aletheia Engine (V3.1 with Identity) is awake and ready.")
 
         # --- Initialize ZMQ Sockets ---
         context = zmq.Context()
@@ -76,13 +75,10 @@ def main(dummy_mode: bool = False):
             if command_json.get("command") == "seed_memory":
                 texts = command_json.get("payload", {}).get("texts", [])
                 if texts:
-                    # Create dummy traces to seed the atlas
+                    from core.schemas import Trace, Summary, Best, Reflection, ModelInfo
+                    from datetime import datetime, timezone
+                    
                     for i, text in enumerate(texts):
-                        # We now import all the necessary schemas
-                        from core.schemas import Trace, Summary, Best, Reflection, ModelInfo
-                        from datetime import datetime, timezone
-                        
-                        # Create valid default objects for the required fields
                         dummy_best = Best(attempt_id=0, candidate=text, total=0.0)
                         dummy_reflection = Reflection(what_worked="Seeded memory.", what_failed="N/A", next_adjustment="N/A")
                         dummy_model_info = ModelInfo(name="seed", runtime="system", temp=0.0)
@@ -93,7 +89,6 @@ def main(dummy_mode: bool = False):
                             seed_id="eira-001",
                             summary=Summary(answer=text, reasoning="Seeded from test script", next_action="N/A"),
                             attempts=[], 
-                            # Pass the valid dummy objects instead of None
                             best=dummy_best, 
                             reflection=dummy_reflection, 
                             model_info=dummy_model_info, 
@@ -133,10 +128,12 @@ def main(dummy_mode: bool = False):
                     logger.info(f"Published telemetry for {query_id}: Stage {stage}")
 
                 context_string = session_manager.generate_trifold_context(query)
-                # The V3 loop expects the original query, not the enriched one.
-                # It handles its own context and prompting internally.
+
+                # CHANGED: The generated context_string is now passed to the ATP loop.
+                # This is the fix for the "Amnesia" problem.
                 final_trace = atp_loop.reason(
-                    query, # Pass the original query
+                    query, 
+                    context=context_string,
                     progress_callback=progress_callback, 
                     gear_override=gear_override
                 )
