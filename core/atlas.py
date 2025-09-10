@@ -18,33 +18,33 @@ class ConceptualAtlas:
         logger.info("Initializing Conceptual Atlas...")
         self.model_manager = model_manager
         
-        # Initialize the ChromaDB client
-        # This will create the directory if it doesn't exist.
         self.client = chromadb.PersistentClient(path=db_path)
 
-        # Create a custom embedding function that uses our ModelManager
-        # We need to properly initialize our custom class with the model_manager
         class AletheiaEmbeddingFunction(embedding_functions.EmbeddingFunction):
-            # The __init__ method for our custom class
             def __init__(self, model_manager_instance: ModelManager):
                 self.model_manager = model_manager_instance
 
             def __call__(self, input: List[str]) -> List[List[float]]:
                 logger.info(f"Atlas: Embedding batch of {len(input)} documents...")
-                # Now `self.model_manager` will exist
                 embeddings = self.model_manager.create_embedding(input)
                 logger.success("Embedding batch complete.")
                 return embeddings
         
-        # Instantiate our custom embedding function, passing self.model_manager to it
         aletheia_embedder = AletheiaEmbeddingFunction(self.model_manager)
 
-        # Get or create the main collection for traces
+        # Get or create the collection for conversational traces
         self.trace_collection = self.client.get_or_create_collection(
             name="traces",
             embedding_function=aletheia_embedder
         )
-        logger.success(f"Conceptual Atlas is ready. Collection 'traces' has {self.trace_collection.count()} items.")
+        
+        # NEW: Get or create the collection for strategic meta-traces
+        self.strategic_memory_collection = self.client.get_or_create_collection(
+            name="strategic_memory",
+            embedding_function=aletheia_embedder
+        )
+        
+        logger.success(f"Conceptual Atlas is ready. 'traces': {self.trace_collection.count()} items. 'strategic_memory': {self.strategic_memory_collection.count()} items.")
 
     def _prepare_trace_for_embedding(self, trace: Trace) -> tuple[str, dict]:
         """

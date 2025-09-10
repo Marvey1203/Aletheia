@@ -1,4 +1,6 @@
 import re
+import uuid
+from core.atlas import ConceptualAtlas
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any
@@ -223,14 +225,51 @@ def revise_plan_node(state: GraphState, model_manager: ModelManager) -> Dict[str
     new_plan = [line.strip() for line in response.split('\n') if line.strip()]
     return {"linguistic_plan": new_plan, "revision_history": revision_history}
 
+def update_self_model_node(state: GraphState, atlas: ConceptualAtlas) -> Dict[str, Any]:
+    """
+    The final node. Analyzes the completed trace and saves key strategic
+    insights to the strategic_memory collection. This is the core of the
+    AI's ability to learn from its own cognitive processes.
+    """
+    logger.info("Node: update_self_model (Closing the Loop)")
+
+    # 1. Analyze the thought process for key insights
+    query = state["query"]
+    final_score = state.get("scores", {}).get("constitutional_alignment", 0.0)
+    num_revisions = len(state.get("revision_history", []))
+    social_context = state.get("social_context", {})
+    dominant_social_context = max(social_context, key=social_context.get) if social_context else "standard"
+
+    # 2. Formulate the "meta-trace" or "strategic insight"
+    insight_text = (
+        f"Strategic Insight: The query was '{query[:50]}...'. "
+        f"The dominant social context was '{dominant_social_context}'. "
+        f"After {num_revisions} revision(s), a final constitutional alignment of {final_score:.2f} was achieved. "
+        f"Revision History: {state.get('revision_history', [])}"
+    )
+    
+    # 3. Save this insight to the strategic memory for future learning
+    doc_id = f"strat_{uuid.uuid4()}"
+    atlas.strategic_memory_collection.add(
+        ids=[doc_id],
+        documents=[insight_text],
+        metadatas=[{"final_score": final_score, "revisions": num_revisions}]
+    )
+    
+    logger.success(f"Saved strategic insight '{doc_id}' to strategic memory.")
+    
+    # This node doesn't modify the state further, it just learns from it.
+    return {}
+
 # --- The Graph Builder ---
-def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, conductor: Conductor):
+def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, conductor: Conductor, atlas: ConceptualAtlas):
     """
     Builds the LangGraph-based cognitive process, now featuring the Omega Planner V2.
     """
     workflow = StateGraph(GraphState)
 
-    # Add all nodes
+    # --- THIS IS THE CORRECTED LOGIC ---
+    # Step 1: Add ALL nodes to the graph first.
     workflow.add_node("social_acuity", lambda state: social_acuity_node(state, model_manager))
     workflow.add_node("determine_pathway", lambda state: determine_pathway_node(state, conductor))
     workflow.add_node("omega_planner", lambda state: omega_planner_node(state, model_manager))
@@ -238,24 +277,24 @@ def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, c
     workflow.add_node("execute_model", lambda state: execute_model_node(state, model_manager))
     workflow.add_node("omega_critique", lambda state: omega_critique_node(state, model_manager))
     workflow.add_node("revise_plan", lambda state: revise_plan_node(state, model_manager))
+    workflow.add_node("update_self_model", lambda state: update_self_model_node(state, atlas))
 
-    # --- THE NEW MIND TRANSPLANT ---
+    # Step 2: Now, define the entry point and wire all the edges.
     workflow.set_entry_point("social_acuity")
     workflow.add_edge("social_acuity", "determine_pathway")
     workflow.add_edge("determine_pathway", "omega_planner")
     workflow.add_edge("omega_planner", "plan_decoder")
     workflow.add_edge("plan_decoder", "execute_model")
-    
     workflow.add_edge("execute_model", "omega_critique")
+    
     workflow.add_conditional_edges(
         "omega_critique",
         should_finish_node,
-        {"revise": "revise_plan", "end": END}
+        {"revise": "revise_plan", "end": "update_self_model"}
     )
+    workflow.add_edge("revise_plan", "omega_planner")
+    workflow.add_edge("update_self_model", END)
+    # --- END OF CORRECTION ---
     
-    # The revision node needs a more complex flow in the future.
-    # For now, it will generate a linguistic plan and go back to execution.
-    workflow.add_edge("revise_plan", "execute_model")
-
-    logger.info("Cognitive Graph with Omega Planner V2 has been compiled.")
+    logger.info("Cognitive Graph with Strategic Memory Loop has been compiled.")
     return workflow.compile()

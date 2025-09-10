@@ -97,7 +97,7 @@ def main(dummy_mode: bool = False):
         atlas = ConceptualAtlas(model_manager=model_manager)
         conductor = Conductor(model_manager=model_manager)
         session_manager = SessionManager(atlas=atlas)
-        cognitive_app = build_cognitive_graph(identity_core, model_manager, conductor)
+        cognitive_app = build_cognitive_graph(identity_core, model_manager, conductor, atlas)
         logger.success("Aletheia Engine (V5.0) is compiled and ready.")
 
         context = zmq.Context()
@@ -153,12 +153,6 @@ def main(dummy_mode: bool = False):
                     telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
                     telemetry_socket.send_json(telemetry_message)
                     logger.info(f"Published telemetry for {query_id}: Node '{node_name}' completed.")
-                
-                logger.info("Graph streaming complete. Invoking for final state...")
-                final_state = cognitive_app.invoke(initial_state)
-                telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
-                telemetry_socket.send_json(telemetry_message)
-                logger.info(f"Published telemetry for {query_id}: Node '{node_name}' completed.")
                 
                 logger.info("Graph streaming complete. Invoking for final state...")
                 final_state = cognitive_app.invoke(initial_state)
