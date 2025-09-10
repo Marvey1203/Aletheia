@@ -42,6 +42,7 @@ class ModelInfo(BaseModel):
     runtime: str
     temp: float
     model_config = ConfigDict(protected_namespaces=())
+    
 
 class Trace(BaseModel):
     trace_id: str
@@ -64,14 +65,18 @@ class GraphState(TypedDict):
     Represents the state of our cognitive graph.
     Passed between nodes, accumulating information.
     """
+    # Core state
     query: str
     context: str
     
-    # These keys are added during the graph's execution, so they are optional.
+    # NEW: The user's classified intent
+    intent: Optional[str]
+
+    # Cognitive assets
     pathway: Optional[Dict[str, Any]]
     plan: Optional[List[str]]
     candidate_answer: Optional[str]
     scores: Optional[Dict[str, float]]
     
-    # This key is present from the start.
+    # Meta-cognition state
     revision_history: List[str]

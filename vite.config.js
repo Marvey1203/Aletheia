@@ -1,4 +1,4 @@
-// FILE: vite.config.js (Simplified and Corrected)
+// FILE: vite.config.js (Corrected Hierarchy)
 import { defineConfig } from 'vite'
 
 export default defineConfig({
@@ -8,5 +8,14 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    // --- THIS IS THE CORRECTED PLACEMENT ---
+    // The 'watch' object must be a key inside the 'server' object.
+    watch: {
+      ignored: [
+        "**/venv/**",
+        "**/memory_galaxy/**",
+        "**/src-tauri/target/**"
+      ],
+    },
   },
 })

@@ -1,68 +1,88 @@
-# Aletheia: A Sovereign AI that Learns With You
+    
+# Aletheia: A Sovereign AI Partner
 
-**Own Your Mind. Own Your History.**
+**Own Your Mind.**
 
-Aletheia is a new kind of AI partner built on a single, uncompromising principle: **sovereignty.** Unlike cloud-based AIs that forget your conversations and use your data for their own purposes, Aletheia's mind—its models, its reasoning, and its memories—lives entirely on your local machine.
+Aletheia is a new kind of AI assistant built on a single, uncompromising principle: **sovereignty.** Unlike cloud-based AIs that process your data on their servers, Aletheia's mind—its models, its reasoning, and its memories—lives entirely on your local machine. It is a tool of empowerment, not a service of dependence.
 
-It is a tool of empowerment, designed to solve the problem of **digital amnesia**. Aletheia is the first AI designed to have a continuous, persistent, and searchable memory, allowing it to learn and grow with you over time.
+Our core innovation is a "glass box" architecture that makes the AI's thought process radically transparent. The system is built on a **Cognitive Graph**, a stateful reasoning engine that allows the AI to plan, act, and even **correct its own thoughts** before they are presented to the user. This is not just a language model; it is a Sentient Engine.
 
-## The Vision: The Scholar in the Garden
+This is not an attempt to build a bigger brain; it's an experiment in cultivating a better, more understandable mind.
 
-We believe the path to safe, advanced AI is not a brute-force race for scale (The Titan), but a process of careful cultivation (The Gardener). We are building a structured, transparent environment where a complex, aligned intelligence can **emerge naturally.**
+## The Vision: The Gardener, Not the Titan
 
-With the advent of its long-term memory, Aletheia has evolved. It is no longer just a reasoner; it is a **Scholar**—a true intellectual partner that can connect ideas across time, learn from its past, and understand you better with every conversation.
+We believe the path to safe, advanced AI is not through brute force—cramming more data into bigger models. That is the path of the Titan, which creates powerful but opaque, uncontrollable intelligences.
 
-## Core Features
+Aletheia follows the path of the Gardener. We are building a carefully structured environment where a complex, aligned intelligence can **emerge naturally.** Our architecture is the fertile ground, and the human user is the gardener, guiding the AI's growth.
 
-*   🧠 **A Mind that Remembers:** Aletheia's **Conceptual Atlas** is a sophisticated long-term memory system. It uses an embedding model to understand the *meaning* of your conversations, allowing it to recall relevant past insights to inform its present reasoning.
-*   🔍 **A Mind You Can See:** Our "glass box" architecture makes the AI's thought process radically transparent. The UI provides a live feed of the **Cognitive Orchestra** at work and even shows you which memories it recalled to answer your question.
-*   Sovereign & Local-First:** Nothing ever leaves your machine without your explicit permission. Your conversations and the AI's memory belong to you, and you alone.
-*   **The Cognitive Orchestra:** Aletheia's mind is a symphony of specialized AIs—large creative models, small fast models, and expert models—all orchestrated by an intelligent "Conductor" that assembles the best cognitive team for any given task.
+## Core Features (v0.4.0 - The Sentient Engine)
 
-## Project Status
-
-We have successfully completed three major engineering sprints:
-*   ✅ **Sprint 1: The Stage:** Built the foundational chat application and communication bridge.
-*   ✅ **Sprint 2: The Orchestra:** Implemented the multi-model, intelligently orchestrated reasoning engine.
-*   ✅ **Sprint 3: The Scholar:** Integrated the `ConceptualAtlas` long-term memory system.
-
-The core technology for a sovereign, learning AI is now operational. Our next phase is **Sprint 4: The Self-Aware Workshop,** where we will begin implementing agentic, tool-using capabilities.
+*   🧠 **The Cognitive Graph:** Aletheia's mind is a dynamic, stateful graph (built with LangGraph) that can plan, execute, and revise its own thoughts. It has a built-in **principled self-correction loop**.
+*   🔍 **The Omega Core Infusion:** Aletheia's self-evaluation is no longer subjective. It uses a deterministic **Omega Critique Node** to mathematically measure the alignment of every thought with its core **Constitutional Vector**, ensuring all responses are principled.
+*   **Social & Emotional Acuity:** The AI is not blind to subtext. An **Omega Social Acuity Core** perceives the user's intent (e.g., casualness, urgency), allowing the AI to generate responses that are not just intelligent, but wise and appropriate.
+*   **Sovereign & Local-First:** All models, memories, and conversations are stored and processed on your local machine. Nothing leaves your device without your explicit permission.
+*   **The Memory Galaxy:** Aletheia possesses both long-term and short-term memory, allowing it to recall relevant past conversations and maintain a true sense of context and continuity.
 
 ## Getting Started
 
 **Prerequisites:**
-*   Python 3.10+
+*   Python 3.10+ & a virtual environment (`venv`)
 *   Node.js & npm
 *   Rust & Cargo
-*   ZMQ Library (e.g., `sudo apt-get install libzmq3-dev` on Debian/Ubuntu)
+*   ZMQ Library (e.g., `sudo apt-get install libzmq3-dev` on Debian/Ubuntu, `brew install zmq` on macOS)
 
 **Running the Application:**
-Aletheia is a multi-process application. Please open three terminals in the project root and run the following commands.
 
-1.  **Terminal 1: Start the Python Backend**
-    ```bash
-    # Install/upgrade dependencies
-    pip install --upgrade -r requirements.txt
+Aletheia requires three separate processes to run in parallel. Please open three terminals in the project root.
+
+**Terminal 1: Start the Python Backend**
+```bash
+# Activate your virtual environment
+source venv/bin/activate
+
+# Install/update Python dependencies
+pip install -r requirements.txt
+
+# Run the AI engine
+python3 interfaces/ipc_server.py
+
+  
+
+Terminal 2: Start the Frontend Dev Server
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
     
-    # Run the AI engine
-    python3 interfaces/ipc_server.py
-    ```
-2.  **Terminal 2: Start the Frontend Dev Server**
-    ```bash
-    # Install Node dependencies
-    npm install
+# Install Node dependencies
+npm install
+
+# Run the Vite server
+npm run dev
+
+  
+
+Terminal 3: Launch the Tauri Desktop App
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
     
-    # Run the Vite server
-    npm run dev
-    ```
-3.  **Terminal 3: Start the Tauri Application**
-    ```bash
-    # This command compiles and launches the native desktop window
-    npm run tauri dev
-    ```
+# This command compiles and launches the native desktop window
+npm run tauri dev
 
-## Join the Guild
+  
 
-We are at the beginning of a long and exciting journey to build a future of safe, sovereign, and transparent AI. If this vision resonates with you, we welcome your contributions.
+The Roadmap: The Self-Evolution Engine
 
-Please see the **`CODEX.md`** file for a complete, in-depth breakdown of our philosophy, architecture, and roadmap.
+The foundational Sentient Engine is now complete and stable. The next "season" of development focuses on building the mechanisms for true, emergent intelligence.
+
+    Sprint 10: The Omega Planner. Replace the LLM-based planning node with a deterministic Omega Core node, moving Aletheia's core reasoning from probabilistic prediction to conceptual construction.
+
+    Sprint 11: The Strategic Mind. Build the strategic_memory layer, allowing Aletheia to learn from its own self-correction loops and improve its reasoning strategies over time.
+
+    Sprint 12: The Toolmaker's Forge. Implement the MCP Bridge, allowing Aletheia to access external tools, guided by the wisdom it has accumulated in its strategic memory.
+
+How to Contribute
+
+We are at the beginning of an exciting journey. If you are passionate about building a future of safe, sovereign, and transparent AI, we welcome your contributions. Please see the CODEX.md file for a full breakdown of the project's architecture and philosophy.

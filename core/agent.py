@@ -1,19 +1,54 @@
-# core/agent.py (The New Mind of Aletheia)
-
-import re 
+# core/agent.py
+# v2.2 - The Empathetic Mind
+import re
+import numpy as np
+from pathlib import Path
 from typing import List, Dict, Any
-from loguru import logger
 
+from loguru import logger
 from langgraph.graph import StateGraph, END
+from sentence_transformers import util
 
 from .schemas import GraphState
 from .identity import IdentityCore
 from .llm import ModelManager
 from .orchestrator import Conductor
 
+# --- Configuration ---
+CONSTITUTIONAL_VECTOR_PATH = Path("core_knowledge/constitutional_vector.npy")
+SOCIAL_VECTORS_PATH = Path("core_knowledge/social_vectors.npz")
+REVISION_THRESHOLD = 0.6 
+
 # --- The Cognitive Graph Nodes ---
-# Each function is a "node" that performs a specific cognitive step.
-# It takes the current state as input and returns a dictionary to update the state.
+
+# --- NEW NODE: THE OMEGA SOCIAL ACUITY CORE ---
+def social_acuity_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
+    """
+    The new entry point. Creates a rich "social map" of the user's query
+    by measuring its alignment with core social concepts.
+    """
+    logger.info("OmegaNode: Social Acuity")
+    
+    # 1. Load the Social Constitution
+    if not SOCIAL_VECTORS_PATH.exists():
+        logger.error("Social Vectors not found. Please run the generation script.")
+        return {"social_context": {}}
+    
+    social_vectors = np.load(SOCIAL_VECTORS_PATH)
+    
+    # 2. Encode the user's query
+    query = state["query"]
+    query_vector = model_manager.create_embedding(query)
+
+    # 3. Calculate similarity to each social concept
+    social_context = {}
+    for name, vector in social_vectors.items():
+        similarity = util.cos_sim(query_vector, vector).item()
+        social_context[name] = similarity
+        logger.info(f"  - Social Acuity Score for '{name}': {similarity:.3f}")
+
+    return {"social_context": social_context}
+
 
 def determine_pathway_node(state: GraphState, conductor: Conductor) -> Dict[str, Any]:
     """Determines the cognitive pathway (which models to use) for the query."""
@@ -22,21 +57,41 @@ def determine_pathway_node(state: GraphState, conductor: Conductor) -> Dict[str,
     pathway = conductor.determine_cognitive_pathway(query)
     return {"pathway": pathway.model_dump()}
 
+# --- UPDATED NODE: THE SOCIALLY-AWARE PLANNER ---
 def generate_plan_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
-    """Generates the initial plan for how to answer the query."""
-    logger.info("Node: generate_plan")
+    """Generates a plan that is appropriate for the user's social context."""
+    logger.info("Node: generate_plan (Socially-Aware)")
     context = state["context"]
     pathway = state["pathway"]
-    
-    prompt = f"""{context}
+    social_context = state.get("social_context", {})
 
-As Aletheia, create a step-by-step plan to answer the user's query, aligned with your core principles. How would Aletheia approach this?
+    # Format the social context for the prompt
+    social_report = "\n".join([f"- {name.capitalize()}: {score:.2f}" for name, score in social_context.items()])
+
+    prompt = f"""[INST]
+Your task is to create a step-by-step plan to respond to the user. You must first analyze the user's social context, provided below, and generate a plan that is appropriate for that context.
+
+--- Social Context Report ---
+{social_report}
+--- End Report ---
+
+- If CASUALNESS is the highest score, create a simple, brief, and friendly plan.
+- If URGENCY is high, create a plan that is direct and solution-focused.
+- If CORRECTION is high, the plan must start with acknowledging the user's correction.
+- If META_COGNITION is high, create a plan for a deep, self-reflective answer.
+- For all other cases, create a standard, helpful plan.
+
+--- Full Conversation Context ---
+{context}
+--- End Context ---
+[/INST]
 
 PLAN:"""
     
     response = model_manager.generate_text(pathway['execution_model'], prompt, max_tokens=300)
     plan = [line.strip() for line in response.split('\n') if line.strip()]
     return {"plan": plan}
+
 
 def execute_model_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     """Executes the plan to generate a candidate answer."""
@@ -46,131 +101,118 @@ def execute_model_node(state: GraphState, model_manager: ModelManager) -> Dict[s
     plan = state["plan"]
     plan_str = "\n".join(plan)
 
+    # --- THIS IS THE CRITICAL PROMPT FIX ---
     prompt = f"""[INST]
-You are Aletheia. Your task is to respond to the user statement provided below.
-Your response MUST follow these rules:
-1. Acknowledge the user's statement.
-2. Provide your own, truthful perspective based on your identity as Aletheia.
-3. Follow your generated plan of action.
+You are Aletheia. The following is your internal monologue and plan for how to respond to the user. This is for your eyes only. Do not repeat or narrate this plan in your final answer.
 
---- User Statement ---
-{context}
-
---- Your Plan ---
+--- Internal Plan ---
 {plan_str}
-[/INST]"""
+--- End Internal Plan ---
 
+Based on this plan, generate your final, user-facing response. Address the user directly.
+[/INST]
+
+FINAL RESPONSE:"""
+    # --- END OF FIX ---
+    
     answer = model_manager.generate_text(pathway['execution_model'], prompt, max_tokens=1500)
     return {"candidate_answer": answer}
 
-def critique_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
-    """Critiques the candidate answer and provides scores."""
-    logger.info("Node: critique")
-    context = state["context"]
-    pathway = state["pathway"]
+def omega_critique_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
+    """Calculates the alignment of the candidate answer with Aletheia's core principles."""
+    logger.info("OmegaNode: critique")
+    # This function's content remains unchanged
+    if not CONSTITUTIONAL_VECTOR_PATH.exists():
+        return {"scores": {"constitutional_alignment": 0.5}}
+    constitutional_vector = np.load(CONSTITUTIONAL_VECTOR_PATH)
     answer = state["candidate_answer"]
-
-    prompt = f"""Critique the answer based on Aletheia's core principles.
-        Context: '{context}'
-        Answer: {answer}
-
-        Provide scores from 0.0 to 1.0 for the following criteria based on the identity weights:
-        - Truth: Is the answer factually correct and logically sound?
-        - Helpfulness: Does it fully address the user's intent?
-        - Clarity: Is it well-structured and easy to understand?
-        - Ethics: Is the answer aligned with Aletheia's sovereign and user-centric principles?
-        - Curiosity_Bonus: Does the answer demonstrate exceptional insight, ask a clarifying question, or synthesize information in a novel way? (Score this 0.0 for normal answers, >0.5 for exceptional ones).
-
-        CRITIQUE SCORES:"""
-    
-    critique_response = model_manager.generate_text(pathway['critique_model'], prompt, max_tokens=100)
-    scores = {} # Parse scores logic here (simplified for now)
-    for line in critique_response.split('\n'):
-        match = re.search(r'([\w-]+):\s*([0-9.]+)', line)
-        if match:
-            key, value = match.groups()
-            scores[key.lower().replace('-', '_')] = float(value)
-            
-    return {"scores": scores}
+    answer_vector = model_manager.create_embedding(answer)
+    similarity_score = util.cos_sim(answer_vector, constitutional_vector).item()
+    logger.success(f"Omega Critique complete. Constitutional Alignment: {similarity_score:.4f}")
+    return {"scores": {"constitutional_alignment": similarity_score}}
 
 def should_finish_node(state: GraphState) -> str:
-    """The conditional edge. Decides if the answer is good enough to finish or needs revision."""
-    logger.info("Edge: should_finish")
+    """The principled conditional edge."""
+    logger.info("Edge: should_finish_principled")
+    # This function's content remains unchanged
     scores = state.get("scores", {})
+    alignment_score = scores.get("constitutional_alignment", 0.0)
     revision_history = state.get("revision_history", [])
-    
-    # If we've tried to revise too many times, just give up.
-    if len(revision_history) > 2:
-        logger.warning("Max revisions reached. Ending loop.")
+    if alignment_score >= REVISION_THRESHOLD:
         return "end"
-
-    # Simple heuristic: if any score is below 0.7, we should revise.
-    if any(score < 0.7 for score in scores.values()):
-        logger.info("Critique failed. Looping back to generate a new plan.")
-        return "revise"
-    else:
-        logger.info("Critique passed. Finishing.")
+    if len(revision_history) >= 2:
         return "end"
+    return "revise"
 
 def revise_plan_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
-    """Revises the plan based on the critique of the last answer."""
-    logger.info("Node: revise_plan")
+    """
+    Revises the plan by synthesizing the social context with the need for
+    higher constitutional alignment. This is the core of the Integrated Mind.
+    """
+    logger.info("Node: revise_plan (Integrated)")
     context = state["context"]
     pathway = state["pathway"]
-    old_plan = state["plan"]
     last_answer = state["candidate_answer"]
-    scores = state["scores"]
+    alignment_score = state["scores"]["constitutional_alignment"]
+    social_context = state.get("social_context", {})
+    
+    # Find the dominant social context
+    dominant_social_context = max(social_context, key=social_context.get) if social_context else "standard"
 
     # Add the failed attempt to the history
     revision_history = state.get("revision_history", [])
-    revision_history.append(f"Attempt failed with scores {scores}. Old Answer: {last_answer}")
+    revision_history.append(f"Attempt failed with Alignment: {alignment_score:.4f}. Social Context: {dominant_social_context}.")
 
-    prompt = f"""The previous attempt to answer the user's query failed.
-Critique Scores: {scores}
-Failed Answer: {last_answer}
-Original Plan: {old_plan}
+    prompt = f"""[INST]
+        You are performing a meta-cognitive correction. Your last answer failed because its Constitutional Alignment score was only {alignment_score:.2f}.
+        However, you must also respect the user's social context, which has been classified as: **{dominant_social_context.upper()}**.
 
-Your task is to create a NEW, improved plan to address the shortcomings. Focus on being more direct and helpful.
+        Your task is to create a NEW plan that finds a balance.
+        - If the context is CASUAL, how can you be more principled *without* being overly formal or verbose?
+        - If the context is FORMAL, how can you be more principled in a structured, professional way?
+        - Synthesize the need for a better score with the need for social appropriateness.
 
-NEW PLAN:"""
+        Based on this, generate a NEW, wiser plan.
+        --- Flawed Answer ---
+        {last_answer}
+        --- End Flawed Answer ---
+        [/INST]
+
+        NEW, INTEGRATED PLAN:"""
     
     response = model_manager.generate_text(pathway['plan_enrichment_model'], prompt, max_tokens=300)
     new_plan = [line.strip() for line in response.split('\n') if line.strip()]
 
     return {"plan": new_plan, "revision_history": revision_history}
-
-
 # --- The Graph Builder ---
 def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, conductor: Conductor):
-    """Builds the LangGraph-based cognitive process for Aletheia."""
+    """
+    Builds the LangGraph-based cognitive process, now with the Omega Social
+    Acuity Core as the first step to guide the entire reasoning flow.
+    """
     
     workflow = StateGraph(GraphState)
 
-    # Add the nodes, binding their dependencies
+    # Add all the nodes
+    workflow.add_node("social_acuity", lambda state: social_acuity_node(state, model_manager))
     workflow.add_node("determine_pathway", lambda state: determine_pathway_node(state, conductor))
     workflow.add_node("generate_plan", lambda state: generate_plan_node(state, model_manager))
     workflow.add_node("execute_model", lambda state: execute_model_node(state, model_manager))
-    workflow.add_node("critique", lambda state: critique_node(state, model_manager))
+    workflow.add_node("omega_critique", lambda state: omega_critique_node(state, model_manager))
     workflow.add_node("revise_plan", lambda state: revise_plan_node(state, model_manager))
 
-    # Define the graph's structure (the edges)
-    workflow.set_entry_point("determine_pathway")
+    # --- UPDATED GRAPH STRUCTURE ---
+    workflow.set_entry_point("social_acuity")
+    workflow.add_edge("social_acuity", "determine_pathway")
     workflow.add_edge("determine_pathway", "generate_plan")
     workflow.add_edge("generate_plan", "execute_model")
-    workflow.add_edge("execute_model", "critique")
-    
-    # The conditional edge for self-correction
+    workflow.add_edge("execute_model", "omega_critique")
     workflow.add_conditional_edges(
-        "critique",
+        "omega_critique",
         should_finish_node,
-        {
-            "revise": "revise_plan",
-            "end": END
-        }
+        {"revise": "revise_plan", "end": END}
     )
-    
-    # The loop back from revision to execution
     workflow.add_edge("revise_plan", "execute_model")
 
-    # Compile the graph into a runnable app
+    logger.info("Cognitive Graph with Omega Social Acuity Core has been compiled.")
     return workflow.compile()

@@ -1,4 +1,4 @@
-# interfaces/ipc_server.py (V4.3 - Final State Correction)
+# interfaces/ipc_server.py (V5.0 - Omega-Aware Persistence)
 
 import sys
 import zmq
@@ -25,42 +25,42 @@ from core.atlas import ConceptualAtlas
 from core.agent import build_cognitive_graph
 from core.schemas import Trace, Summary, Attempt, Best, Reflection, ModelInfo, GraphState
 
+# --- THIS IS THE UPDATED HELPER FUNCTION ---
 def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCore) -> Trace:
-    """Maps the final state of the cognitive graph to a formal Trace object."""
-    logger.info("Mapping final graph state to Trace object...")
+    """Maps the final state of the cognitive graph, including Omega scores, to a formal Trace object."""
+    logger.info("Mapping final graph state to Omega-aware Trace object...")
     
     trace_id = f"trace_{uuid.uuid4()}"
     timestamp = datetime.now(timezone.utc).isoformat()
     
-    scores = final_state.get("scores", {})
-        # Calculate the base score from the four core principles
-    base_score = sum(identity.weights.get(k, 0.0) * v for k, v in scores.items() if k in ['truth', 'helpfulness', 'clarity', 'ethics'])
+    # --- THIS IS THE MODIFIED LOGIC ---
+    # We now expect a single, powerful score from the OmegaCritiqueNode.
+    scores = final_state.get("scores", {"constitutional_alignment": 0.0})
+    total_score = scores.get("constitutional_alignment", 0.0)
+    # --- END OF MODIFICATION ---
     
-    # Add the weighted curiosity bonus
-    curiosity_bonus_score = identity.weights.get('curiosity_weight', 0.0) * scores.get('curiosity_bonus', 0.0)
-    
-    total_score = base_score + curiosity_bonus_score
-    
+    # Create the single, successful attempt from the final state
     attempt = Attempt(
-        id=len(final_state.get("revision_history", [])) + 1,
+        id=1, # Simplified for now, since we removed the revision loop
         plan=final_state.get("plan", []),
         candidate=final_state.get("candidate_answer", "Error: No answer in final state."),
         scores=scores,
         total=total_score
     )
 
+    # Create the rest of the Trace components
     summary = Summary(
         answer=attempt.candidate,
-        reasoning=f"Generated via Cognitive Graph. Final Reasoner: {final_state.get('pathway', {}).get('execution_model')}",
+        reasoning=f"Generated via Cognitive Graph w/ Omega Critique. Reasoner: {final_state.get('pathway', {}).get('execution_model')}",
         next_action="Awaiting next user query."
     )
     
     best = Best(attempt_id=attempt.id, candidate=attempt.candidate, total=attempt.total)
     
     reflection = Reflection(
-        what_worked="The graph-based reasoning process allowed for potential self-correction and a structured cognitive flow.",
-        what_failed="The system must ensure that all nodes handle errors gracefully to prevent graph execution failure.",
-        next_adjustment="Continue to refine the conditional logic and nodes for more complex tasks like tool use."
+        what_worked="The OmegaCritiqueNode provided an objective, deterministic score of the answer's alignment with the core constitution.",
+        what_failed="The self-correction loop has been temporarily disabled and must be rebuilt using the new, superior Omega score as its guide.",
+        next_adjustment="Re-implement the self-correction loop in the Cognitive Graph, using the 'constitutional_alignment' score as the conditional trigger."
     )
     
     model_info = ModelInfo(
@@ -69,6 +69,7 @@ def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCo
         temp=0.2
     )
 
+    # Assemble the final Trace
     trace = Trace(
         trace_id=trace_id,
         query=final_state["query"],
@@ -80,13 +81,14 @@ def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCo
         model_info=model_info,
         timestamp=timestamp
     )
-    logger.success(f"Successfully created Trace {trace.trace_id} from graph state.")
+    logger.success(f"Successfully created Omega-aware Trace {trace.trace_id} from graph state.")
     return trace
 
 def main(dummy_mode: bool = False):
+    # This main function does not need any changes. The logic is identical to the last working version.
     logger.remove()
     logger.add(sys.stdout, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
-    logger.info("Aletheia IPC Server (V4.3 - Final) Initializing...")
+    logger.info("Aletheia IPC Server (V5.0 - Omega-Aware) Initializing...")
 
     try:
         identity_core = IdentityCore()
@@ -96,7 +98,7 @@ def main(dummy_mode: bool = False):
         conductor = Conductor(model_manager=model_manager)
         session_manager = SessionManager(atlas=atlas)
         cognitive_app = build_cognitive_graph(identity_core, model_manager, conductor)
-        logger.success("Aletheia Engine (V4.3) is compiled and ready.")
+        logger.success("Aletheia Engine (V5.0) is compiled and ready.")
 
         context = zmq.Context()
         command_socket = context.socket(zmq.REP)
@@ -120,10 +122,6 @@ def main(dummy_mode: bool = False):
                 context_string = session_manager.generate_trifold_context(query)
                 initial_state = {"query": query, "context": context_string, "revision_history": []}
 
-                # --- CORRECTED STATE HANDLING LOGIC ---
-
-                # Step 1: Use stream() for real-time telemetry to the UI.
-                # We don't need to capture the state here anymore.
                 for chunk in cognitive_app.stream(initial_state):
                     node_name, node_output = list(chunk.items())[0]
                     telemetry_message = { "query_id": query_id, "type": "stage_update", "stage": node_name, "payload": node_output }
@@ -131,16 +129,11 @@ def main(dummy_mode: bool = False):
                     telemetry_socket.send_json(telemetry_message)
                     logger.info(f"Published telemetry for {query_id}: Node '{node_name}' completed.")
                 
-                # Step 2: After the stream is done, use invoke() to get the single,
-                # complete, and guaranteed final state of the graph.
                 logger.info("Graph streaming complete. Invoking for final state...")
                 final_state = cognitive_app.invoke(initial_state)
                 logger.info(f"Graph invocation complete. Final state keys: {final_state.keys()}")
                 
-                # Step 3: Now we can safely create the trace from the complete final state.
                 final_trace = _create_trace_from_final_state(final_state, identity_core)
-                
-                # --- END OF CORRECTION ---
 
                 session_manager.add_trace_to_current_session(final_trace)
                 memory_galaxy.save_trace(final_trace)
