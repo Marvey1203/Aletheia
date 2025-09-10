@@ -122,15 +122,47 @@ def main(dummy_mode: bool = False):
                 context_string = session_manager.generate_trifold_context(query)
                 initial_state = {"query": query, "context": context_string, "revision_history": []}
 
+                                # --- THIS IS THE CORRECTED LOGIC ---
+                final_state = {}
                 for chunk in cognitive_app.stream(initial_state):
-                    node_name, node_output = list(chunk.items())[0]
-                    telemetry_message = { "query_id": query_id, "type": "stage_update", "stage": node_name, "payload": node_output }
+                    node_name, current_node_output = list(chunk.items())[0]
+                    
+                    final_state = current_node_output
+
+                    # --- TELEMETRY TRANSLATOR (V2 - NOW AWARE OF SOCIAL ACUITY) ---
+                    serializable_output = {}
+                    if node_name == "omega_planner":
+                        # For the Omega Planner, send a clean summary.
+                        num_steps = len(current_node_output.get("plan_vectors", []))
+                        serializable_output = {
+                            "status": "success",
+                            "conceptual_steps_created": num_steps
+                        }
+                    elif node_name == "social_acuity":
+                        # For Social Acuity, send the scores but not the raw vector.
+                        # We create a copy and remove the non-serializable part.
+                        output_copy = current_node_output.copy()
+                        output_copy.pop("plan_vectors", None) # Safely remove the key
+                        serializable_output = output_copy
+                    else:
+                        # For all other nodes, the output is already JSON-safe.
+                        serializable_output = current_node_output
+                    # --- END OF TRANSLATOR ---
+
+                    telemetry_message = { "query_id": query_id, "type": "stage_update", "stage": node_name, "payload": serializable_output }
                     telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
                     telemetry_socket.send_json(telemetry_message)
                     logger.info(f"Published telemetry for {query_id}: Node '{node_name}' completed.")
                 
                 logger.info("Graph streaming complete. Invoking for final state...")
                 final_state = cognitive_app.invoke(initial_state)
+                telemetry_socket.send_string(query_id, flags=zmq.SNDMORE)
+                telemetry_socket.send_json(telemetry_message)
+                logger.info(f"Published telemetry for {query_id}: Node '{node_name}' completed.")
+                
+                logger.info("Graph streaming complete. Invoking for final state...")
+                final_state = cognitive_app.invoke(initial_state)
+                
                 logger.info(f"Graph invocation complete. Final state keys: {final_state.keys()}")
                 
                 final_trace = _create_trace_from_final_state(final_state, identity_core)
