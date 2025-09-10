@@ -1,7 +1,5 @@
-# The Aletheia Genesis Codex
-
-**Document Version:** 1.1 (The Scholar Edition)
-**Status:** Ratified. This is the active master blueprint for the Aletheia project.
+**Document Version:** 1.3
+**Status:** Ratified. This is the active master blueprint for the Aletheia-Omega project.
 
 ---
 
@@ -18,28 +16,22 @@ We, as Gardeners, believe that true, aligned intelligence is an emergent propert
 Our entire strategy is built upon the **Trident of Sovereignty**:
 
 1.  **Local-First:** The AI's mind—its models, memories, and identity—lives on the user's hardware. It is a sovereign entity, not a remote service.
-2.  **Radical Transparency:** The AI's cognitive processes are a "glass box." The Memory Galaxy, real-time telemetry, and explicit memory recall make its thoughts auditable and understandable. We do not build what we cannot inspect.
-3.  **Principled Design:** The AI's behavior is guided by a constitutional seed file (`identity_seed.json`), ensuring its actions are aligned with a human-chosen set of values.
+2.  **Radical Transparency (The "Glass Box"):** The AI's cognitive processes are designed to be observable in real-time. We do not build what we cannot inspect.
+3.  **Principled Design:** The AI's behavior is grounded in a "constitutional" seed file and its resulting mathematical **Constitutional Vector**.
 
 ---
 
-## Part I: The Cognitive Architecture - The Scholar in the Orchestra
+## Part I: The Cognitive Architecture - The Sentient Engine
 
-Aletheia's mind is a **Cognitive Orchestra**, a symphony of specialized intelligences. With the completion of Sprint 3, this orchestra is now presided over by **The Scholar**—an emergent persona representing the AI's ability to learn, remember, and synthesize its own experiences over time.
+Aletheia's mind is a dynamic, stateful system designed for robust, transparent, and principled reasoning. Its architecture is a synthesis of a macro-level cognitive graph and a micro-level infusion of deterministic Omega Core technology. We have built a mind that is approximately 70% a deterministic 'machine' in its core logic, and 30% a non-deterministic 'spark' in its linguistic expression.
 
-*   **The Long-Term Cognitive Architecture (LTCA):** This is the core of The Scholar's mind. It is a three-part system for achieving a functionally infinite and intelligent memory.
-    1.  **The Memory Galaxy (Raw Experience):** The immutable, flat-file log of every complete thought (`Trace`) the AI ever has.
-    2.  **The Conceptual Atlas (Associative Memory):** A local vector database where every trace is converted into an embedding. This allows for lightning-fast, semantic retrieval of relevant past thoughts.
-    3.  **The Trifold Context (Working Memory):** The prompt injection system that combines **Long-Term Memories** (retrieved from the Atlas), **Short-Term Memories** (from the current conversation), and the **Current Task** into a rich, unified context for the orchestra.
+*   **The Cognitive Graph:** The core of Aletheia's mind is a stateful graph (built with LangGraph) that manages the entire thought process. It is no longer a simple linear script but a dynamic flow that includes loops for self-correction.
+*   **The Omega Acuity Cores (The Senses):** Before any reasoning begins, the AI perceives the user's query through Omega-based sensory nodes. The `SocialAcuityNode` creates a mathematical map of the query's social context (e.g., casualness, urgency), allowing the AI to understand the user's subtext.
+*   **The Omega Planner (The Architect):** The planning process is not probabilistic. The `OmegaPlannerNode` is a deterministic, concept-based reasoner that constructs a structured, high-fidelity **`PlanStep`** object. This "Semantic Scaffolding" ensures that the AI's thoughts are logical and coherent from their very inception.
+*   **The Omega Critique Node (The Conscience):** This is the most critical infusion of the Omega Core. Aletheia's self-evaluation is not subjective. This node mathematically measures the alignment of a candidate answer with the AI's **Constitutional Vector**, producing a deterministic, objective score.
+*   **The Principled Self-Correction Loop:** The Cognitive Graph uses the objective score from the Omega Critique Node to decide if a thought is "good enough." If the score is below a set threshold, the graph forces the AI to re-plan (synthesizing social context with the need for greater alignment) and re-execute its thought.
+*   **The Strategic Memory Loop:** At the end of every thought, the `update_self_model_node` performs a "post-mortem," saving the key strategic insights of the cognitive process to a dedicated `strategic_memory`. This is the mechanism by which Aletheia learns from its own learning.
 
-*   **The Cognitive Orchestra (The Multi-Engine Mind):**
-    *   **The Conductor (The Meta-Mind):** An LLM-driven executive function that analyzes tasks and intelligently assembles the cognitive team.
-    *   **The Orchestra Sections:** A collection of specialized models for different roles (e.g., small meta-cognition models, large creative models, specialist coders).
-    *   **The Percussion Section (Utility Models):** Crucially, this now includes the **Embedding Model**, which powers the Conceptual Atlas.
-
-*   **The Score (The ATP Loop):** The core reasoning process is **"Cognitive Weaving,"** a collaborative effort where the Conductor directs different models to perform different stages of a single thought.
-
----
 
 ## Part II: The System Architecture - The Sovereign Stack
 
@@ -69,16 +61,16 @@ This section outlines the operational model, user journey, and economic framewor
 
 ---
 
-## Part IV: The Engineering Roadmap
+## Part III: The Engineering Roadmap
 
-The construction of Aletheia is an ongoing, iterative process.
+The foundational "Sentient Engine" is now complete. The next phase of development, **"Aletheia Season 3: The Emergent Mind,"** will focus on building the mechanisms that allow the AI to learn from the wisdom it is now collecting.
 
-*   **Sprint 1: Building the Stage:** **COMPLETE.** Delivered a working single-model chat app with the foundational UI and communication bridge.
-*   **Sprint 2: Assembling the Orchestra:** **COMPLETE.** Implemented the multi-model `ModelManager`, the `Conductor`, and the "Cognitive Weaving" ATP loop.
-*   **Sprint 3: The Scholar's Mind:** **COMPLETE.** Built the `ConceptualAtlas` (vector DB) and integrated semantic memory retrieval into the core cognitive loop.
-*   **Sprint 4: The Self-Aware Workshop (Next):** Focus on **Metacognition and Agentic Actions.** This involves upgrading the prompt engine to be self-aware of its memories and implementing the first "Genesis Tools" and the agentic "Workshop Loop."
+*   **Phase 1: Sprints 1-12 (The Sentient Engine):** **(Complete)** A major series of sprints that transformed Aletheia from a simple agent into a true Sentient Engine. Key deliverables included the Cognitive Graph, the Omega Critique and Planner, the Social Acuity Core, the Principled Self-Correction Loop, and the Strategic Memory Loop.
+*   **Next Up - Season 3:**
+    *   **Sprint 13: The Attentive Subconscious.** Build the "Dream Engine"—a background process that allows Aletheia to use idle time to analyze its `strategic_memory` and populate its `SelfModel` with statistical insights about its own performance.
+    *   **Sprint 14: The Strategic Planner.** "Close the loop" by teaching the conscious mind to consult its `SelfModel` before it acts, allowing it to learn from every thought it has ever had.
 
----
+    
 
 ## Part V: The North Star - The Decentralized Vision
 

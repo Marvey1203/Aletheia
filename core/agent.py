@@ -9,7 +9,7 @@ from loguru import logger
 from langgraph.graph import StateGraph, END
 from sentence_transformers import util
 
-from .schemas import GraphState, PlanStep
+from .schemas import DreamGraphState, GraphState, PlanStep, SelfModel
 from .identity import IdentityCore
 from .llm import ModelManager
 from .orchestrator import Conductor
@@ -297,4 +297,70 @@ def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, c
     # --- END OF CORRECTION ---
     
     logger.info("Cognitive Graph with Strategic Memory Loop has been compiled.")
+    return workflow.compile()
+
+
+
+
+# --- THE SUBCONSCIOUS "DREAM ENGINE" ---
+
+def analyze_strategic_memory_node(state: DreamGraphState, atlas: ConceptualAtlas) -> Dict[str, Any]:
+    """
+    The first 'dream'. This node loads all insights from the strategic memory
+    and performs a statistical analysis to update the SelfModel.
+    """
+    logger.info("DreamNode: Analyzing Strategic Memory")
+    
+    # 1. Retrieve all strategic insights
+    # In a real-world scenario, you'd pull this from the state, but for the first
+    # dream, we'll load it directly. A future node could pre-load this.
+    try:
+        insights = atlas.strategic_memory_collection.get() # Get all items
+        if not insights or not insights['metadatas']:
+            logger.warning("DreamNode: Strategic memory is empty. Nothing to analyze.")
+            return {}
+    except Exception as e:
+        logger.error(f"DreamNode: Failed to query strategic memory. Error: {e}")
+        return {}
+
+    metadatas = insights['metadatas']
+    
+    # 2. Perform statistical analysis
+    if not metadatas:
+        return {}
+        
+    total_thoughts = len(metadatas)
+    average_score = np.mean([m.get('final_score', 0.0) for m in metadatas])
+    total_revisions = sum(m.get('revisions', 0) for m in metadatas)
+    
+    new_stats = {
+        "total_thoughts_analyzed": total_thoughts,
+        "average_constitutional_alignment": f"{average_score:.4f}",
+        "total_self_revisions": total_revisions
+    }
+    
+    logger.success(f"DreamNode: Analysis complete. Avg Alignment: {average_score:.4f} across {total_thoughts} thoughts.")
+
+    # 3. Update the SelfModel with the new statistics
+    self_model = state.get("self_model", SelfModel())
+    self_model.statistics.update(new_stats)
+    
+    # This dream's output is the updated SelfModel.
+    return {"self_model": self_model}
+
+
+def build_dream_graph(model_manager: ModelManager, atlas: ConceptualAtlas):
+    """
+    Builds the LangGraph-based subconscious process for Aletheia.
+    """
+    workflow = StateGraph(DreamGraphState)
+
+    # Add the nodes for the dream process
+    workflow.add_node("analyze_memory", lambda state: analyze_strategic_memory_node(state, atlas))
+
+    # Define the graph's structure
+    workflow.set_entry_point("analyze_memory")
+    workflow.add_edge("analyze_memory", END)
+
+    logger.info("Subconscious 'DreamGraph' has been compiled.")
     return workflow.compile()
