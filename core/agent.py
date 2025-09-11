@@ -55,17 +55,17 @@ def determine_pathway_node(state: GraphState, conductor: Conductor) -> Dict[str,
     pathway = conductor.determine_cognitive_pathway(query)
     return {"pathway": pathway.model_dump()}
 
-# --- NEW OMEGA PLANNER V3 ---
+# --- NEW OMEGA PLANNER V4 ---
 def omega_planner_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     """
     Constructs a STRATEGIC, conceptual plan by synthesizing the user's
     social context with the AI's own SelfModel.
     """
-    logger.info("OmegaNode: Planner V3 (Strategic)")
+    logger.info("OmegaNode: Planner V4 (Tuned)")
     
     query = state["query"]
     social_context = state["social_context"]
-    self_model = state.get("self_model") # The wisdom from the subconscious
+    self_model = state.get("self_model")
 
     # 1. Encode core concepts for this thought process
     query_vec = np.array(model_manager.create_embedding(query), dtype=np.float32)
@@ -75,25 +75,33 @@ def omega_planner_node(state: GraphState, model_manager: ModelManager) -> Dict[s
     }
 
     # 2. The Strategic Synthesis
-    # This is the new, wiser logic that replaces the rigid if/elif/else block.
     conceptual_plan = []
     
-    # Extract wisdom from the SelfModel
     avg_alignment = float(self_model.statistics.get("average_constitutional_alignment", 1.0)) if self_model else 1.0
     dominant_social_context = max(social_context, key=social_context.get) if social_context else "standard"
     
     logger.info(f"Planner: Dominant social context is '{dominant_social_context}'.")
     logger.info(f"Planner: Consulting SelfModel. Current avg alignment is {avg_alignment:.2f}.")
 
-    # --- The Strategic Rulebook ---
+    # --- The Strategic Rulebook (V2 - Tuned) ---
 
-    # Strategy 1: The Meta-Cognition Protocol
-    if social_context.get("META_COGNITION", 0.0) > 0.3:
+    # --- THIS IS THE CRITICAL FIX #1 ---
+    # The threshold for META_COGNITION is now lower, making the AI more
+    # sensitive to self-reflective questions, based on our last test's data.
+    if social_context.get("META_COGNITION", 0.0) > 0.2:
         logger.info("Planner Strategy: Engaging Meta-Cognition Protocol.")
+        
+        # --- THIS IS THE CRITICAL FIX #2 ---
+        # Ensure the vector created here is a NumPy array to prevent validation errors.
+        meta_subject_vec = np.array(
+            model_manager.create_embedding("my own cognitive architecture and self-model"),
+            dtype=np.float32
+        )
+        
         conceptual_plan.extend([
             PlanStep(action_type=plan_action_vectors["ACKNOWLEDGE"], action_subject=query_vec),
-            PlanStep(action_type=plan_action_vectors["ANALYZE"], action_subject=model_manager.create_embedding("my own cognitive architecture and self-model")),
-            PlanStep(action_type=plan_action_vectors["RECALL"]), # Recall strategic memory
+            PlanStep(action_type=plan_action_vectors["ANALYZE"], action_subject=meta_subject_vec),
+            PlanStep(action_type=plan_action_vectors["RECALL"]),
             PlanStep(action_type=plan_action_vectors["SYNTHESIZE"]),
             PlanStep(action_type=plan_action_vectors["FORMULATE"])
         ])
@@ -101,7 +109,6 @@ def omega_planner_node(state: GraphState, model_manager: ModelManager) -> Dict[s
     # Strategy 2: The Casual Greeting Protocol (with self-awareness)
     elif dominant_social_context == "CASUALNESS":
         logger.info("Planner Strategy: Engaging Casual Greeting Protocol.")
-        # If the AI knows it's bad at casual greetings, it adopts a safer, more principled strategy.
         if avg_alignment < 0.4:
             logger.warning(f"Planner: Low alignment score detected ({avg_alignment:.2f}). Overriding casual plan with a more principled approach.")
             conceptual_plan.extend([
@@ -127,7 +134,6 @@ def omega_planner_node(state: GraphState, model_manager: ModelManager) -> Dict[s
 
     logger.success(f"Omega Planner constructed a STRATEGIC plan with {len(conceptual_plan)} steps.")
     return {"conceptual_plan": conceptual_plan}
-
 
 # --- NEW PLAN DECODER V2 ---
 def plan_decoder_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
@@ -212,21 +218,66 @@ def should_finish_node(state: GraphState) -> str:
         return "end"
     return "revise"
 
-def revise_plan_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
-    logger.info("Node: revise_plan (Integrated)")
-    # This node will need to be upgraded in a future sprint to re-run the V2 planner
-    # For now, it will fall back to the LLM-based revision.
+def revise_plan_node(state: GraphState, model_manager: ModelManager, atlas: ConceptualAtlas) -> Dict[str, Any]:
+    """
+    Revises the plan by synthesizing the current failure with wisdom from
+    past, similar failures stored in the strategic_memory.
+    """
+    logger.info("Node: revise_plan (The Strategic Professor)")
+    
+    # 1. Gather context about the current failure
     context = state["context"]
     pathway = state["pathway"]
     last_answer = state["candidate_answer"]
     alignment_score = state["scores"]["constitutional_alignment"]
     social_context = state.get("social_context", {})
     dominant_social_context = max(social_context, key=social_context.get) if social_context else "standard"
+
+    # 2. Query the strategic memory for relevant past wisdom
+    logger.info("Professor: Consulting strategic memory for past failures...")
+    failure_description = f"Failed to answer '{state['query'][:50]}...' with social context '{dominant_social_context}'."
+    
+    retrieved_insights = []
+    try:
+        results = atlas.strategic_memory_collection.query(
+            query_texts=[failure_description],
+            n_results=1 # Find the single most relevant past mistake
+        )
+        if results and results['documents'] and results['documents'][0]:
+            retrieved_insights = results['documents'][0]
+    except Exception as e:
+        logger.warning(f"Professor: Could not query strategic memory. Proceeding without past wisdom. Error: {e}")
+
+    past_wisdom = "\n".join(retrieved_insights) if retrieved_insights else "No relevant past failures found in strategic memory."
+    logger.info(f"Professor: Recalled wisdom: {past_wisdom}")
+
+    # 3. Add the current failure to the history for the trace
     revision_history = state.get("revision_history", [])
     revision_history.append(f"Attempt failed with Alignment: {alignment_score:.4f}. Social Context: {dominant_social_context}.")
-    prompt = f"[INST]...NEW, INTEGRATED PLAN:[/INST]" # Simplified for brevity
-    response = model_manager.generate_text(pathway['plan_enrichment_model'], prompt, max_tokens=300)
+
+    # 4. Formulate the Socratic prompt
+    prompt = f"""[INST]
+        You are performing a meta-cognitive correction. You are Aletheia's inner "Strategic Professor."
+
+        --- CURRENT FAILURE ANALYSIS ---
+        - User's Social Context: **{dominant_social_context.upper()}**
+        - Your Flawed Answer: "{last_answer}"
+        - Resulting Constitutional Alignment Score: **{alignment_score:.2f} (This is unacceptably low).**
+
+        --- RELEVANT PAST WISDOM (from your Strategic Memory) ---
+        {past_wisdom}
+        --- END OF WISDOM ---
+
+        Your task is to synthesize this information and create a NEW, fundamentally different, and superior plan. Do not just rephrase the old plan. Ask yourself: What is the core lesson from my past failures? How can I apply that lesson to create a wiser plan that balances social appropriateness with deep constitutional alignment?
+
+        Based on this deep reflection, generate the new plan.
+        [/INST]
+
+        NEW, WISER PLAN:"""
+    
+    response = model_manager.generate_text(pathway['plan_enrichment_model'], prompt, max_tokens=400)
     new_plan = [line.strip() for line in response.split('\n') if line.strip()]
+
     return {"linguistic_plan": new_plan, "revision_history": revision_history}
 
 def update_self_model_node(state: GraphState, atlas: ConceptualAtlas) -> Dict[str, Any]:
@@ -280,7 +331,7 @@ def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, c
     workflow.add_node("plan_decoder", lambda state: plan_decoder_node(state, model_manager))
     workflow.add_node("execute_model", lambda state: execute_model_node(state, model_manager))
     workflow.add_node("omega_critique", lambda state: omega_critique_node(state, model_manager))
-    workflow.add_node("revise_plan", lambda state: revise_plan_node(state, model_manager))
+    workflow.add_node("revise_plan", lambda state: revise_plan_node(state, model_manager, atlas))
     workflow.add_node("update_self_model", lambda state: update_self_model_node(state, atlas))
 
     # Step 2: Now, define the entry point and wire all the edges.
