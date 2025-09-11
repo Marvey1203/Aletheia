@@ -148,10 +148,10 @@ class ModelManager:
                 logger.error(f"Failed to load embedding model for role '{role}': {e}")
                 raise
 
-    def generate_text(self, role: str, prompt: str, **kwargs) -> str:
+    def generate_text(self, role: str, prompt: str, logits_processor=None, **kwargs) -> str:
         """
         Convenience method to generate text, adapting the prompt format
-        to the specific model's capabilities.
+        and optionally applying a logits processor for guided generation.
         """
         if self.dummy_mode: return f"Dummy response for '{role}'."
         llm = self.get_llm(role)
@@ -175,7 +175,13 @@ class ModelManager:
             if 'repeat_penalty' not in kwargs:
                 kwargs['repeat_penalty'] = 1.1
 
-            response = llm.create_chat_completion(messages=messages, **kwargs)
+            # Pass the logits_processor to the generation call if it exists.
+            response = llm.create_chat_completion(
+                messages=messages, 
+                logits_processor=logits_processor, 
+                **kwargs
+            )
+
             return response['choices'][0]['message']['content'].strip()
         except Exception as e:
             logger.error(f"Error during text generation with role '{role}': {e}")
