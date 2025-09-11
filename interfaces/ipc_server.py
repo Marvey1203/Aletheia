@@ -78,7 +78,7 @@ def dream_worker(dream_app, atlas: ConceptualAtlas):
 
 # --- Helper Function for Trace Creation (Now more robust) ---
 def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCore) -> Trace:
-    """Maps the final state of the conscious graph to a formal Trace object."""
+    """Maps the final state of the cognitive graph to a formal Trace object."""
     logger.info("Mapping final graph state to Omega-aware Trace object...")
     
     trace_id = f"trace_{uuid.uuid4()}"
@@ -87,32 +87,36 @@ def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCo
     scores = final_state.get("scores", {"constitutional_alignment": 0.0})
     total_score = scores.get("constitutional_alignment", 0.0)
     
-    # Correctly capture all attempts from the self-correction loop
-    # (This is a placeholder for a more robust multi-attempt capture)
+    # --- THIS IS THE CRITICAL CHANGE ---
+    # Use the new 'decoded_answer' key and get the linguistic plan
+    final_answer = final_state.get("decoded_answer", "Error: No answer in final state.")
+    linguistic_plan = final_state.get("linguistic_plan", [])
+    
     attempt = Attempt(
         id=len(final_state.get("revision_history", [])) + 1,
         plan=final_state.get("linguistic_plan", []),
-        candidate=final_state.get("candidate_answer", "Error: No answer in final state."),
-        scores=scores,
+        candidate=final_state.get("decoded_answer", "Error: No answer in final state."),
+        scores=scores, 
         total=total_score
     )
 
     summary = Summary(
-        answer=attempt.candidate,
-        reasoning=f"Generated via Cognitive Graph. Reasoner: {final_state.get('pathway', {}).get('execution_model')}",
+        answer=final_answer,
+        reasoning=f"Generated via Native Omega Mind. Final Reasoner: {final_state.get('pathway', {}).get('execution_model')}",
         next_action="Awaiting next user query."
     )
     
-    best = Best(attempt_id=attempt.id, candidate=attempt.candidate, total=attempt.total)
+    best = Best(attempt_id=attempt.id, candidate=final_answer, total=attempt.total)
+    # --- END OF CHANGE ---
     
     reflection = Reflection(
-        what_worked="The Cognitive Graph with its Omega Critique and self-correction loop completed a full reasoning cycle.",
-        what_failed="The system must continue to refine its planning and execution nodes to improve the quality and alignment of its first-pass answers.",
-        next_adjustment="Continue the Co-Evolutionary path by building the Strategic Planner and Subconscious Undercurrent."
+        what_worked="The full Omega Core, from planner to executor, ran successfully. The thought was constructed conceptually before being translated to language.",
+        what_failed="The reasoning specialists in the Omega Executor are still V1 prototypes and need to be upgraded to Cognitive Operators for deeper reasoning.",
+        next_adjustment="Begin R&D on training specialized Cognitive Operators as defined in the Aletheia-Omega memo."
     )
     
     model_info = ModelInfo(
-        name=f"Orchestra: {final_state.get('pathway', {}).get('execution_model')}",
+        name=f"Omega Core v1 + {final_state.get('pathway', {}).get('execution_model')} (Decoder)",
         runtime="local",
         temp=0.2
     )
@@ -128,8 +132,9 @@ def _create_trace_from_final_state(final_state: GraphState, identity: IdentityCo
         model_info=model_info,
         timestamp=timestamp
     )
-    logger.success(f"Successfully created Omega-aware Trace {trace.trace_id} from graph state.")
+    logger.success(f"Successfully created Native Mind Trace {trace.trace_id} from graph state.")
     return trace
+
 
 # --- Main Server Function ---
 def main(dummy_mode: bool = False):

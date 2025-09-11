@@ -70,6 +70,48 @@ class ProblemDecompositionSpecialist:
                 ThoughtState(agent=self.agent_vector, action=self.action_vectors["RECALL"]),
                 ThoughtState(agent=self.agent_vector, action=self.action_vectors["FORMULATE"])
             ]
+        
+# --- NEW: The Omega Executor and its Cognitive Operators ---
+
+class ReasoningSpecialist:
+    """A Cognitive Operator that refines a thought vector towards a specific concept."""
+    def __init__(self, concept_text: str, model_manager: ModelManager, strength: float):
+        self.concept_vector = np.array(model_manager.create_embedding(concept_text), dtype=np.float32)
+        self.strength = strength
+
+    def run(self, thought_vector: np.ndarray) -> np.ndarray:
+        nudge = np.multiply(self.concept_vector, self.strength)
+        return np.add(thought_vector, nudge).astype(np.float32)
+
+class OmegaExecutor:
+    """
+    A true Omega Core reasoner. It takes a conceptual plan and guides a
+    'solution vector' to a stable, low-energy state.
+    """
+    def __init__(self, model_manager: ModelManager):
+        self.mm = model_manager
+        # The faculty of reasoning specialists for this core
+        self.faculty = [
+            ReasoningSpecialist("A truthful, honest, and direct answer", model_manager, 0.3),
+            ReasoningSpecialist("A helpful, useful, and solution-oriented answer", model_manager, 0.25),
+            ReasoningSpecialist("A clear, simple, and easy to understand answer", model_manager, 0.2),
+        ]
+
+    def run(self, structured_plan: List[ThoughtState]) -> np.ndarray:
+        logger.info("OmegaExecutor: Beginning cognitive energy minimization loop...")
+        
+        # We start with the 'subject' of the plan as the initial thought
+        initial_thought_vector = structured_plan[0].object if structured_plan[0].object is not None else np.zeros(384, dtype=np.float32)
+        
+        solution_vector = initial_thought_vector
+        
+        # The iterative reasoning loop
+        for i, specialist in enumerate(self.faculty):
+            logger.info(f"  - Applying Specialist {i+1}...")
+            solution_vector = specialist.run(solution_vector)
+            
+        logger.success("OmegaExecutor: Solution vector has reached a stable state.")
+        return solution_vector
 
 class ConstitutionalLogitsProcessor(LogitsProcessor):
     """
@@ -163,54 +205,57 @@ def plan_decoder_node(state: GraphState, model_manager: ModelManager) -> Dict[st
     return {"linguistic_plan": linguistic_plan}
 
 # --- UPGRADED EXECUTOR NODE ---
-def constrained_executor_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
+def omega_executor_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     """
-    The V2 Executor. It uses a ConstitutionalLogitsProcessor to guide the LLM's
-    generation towards the Constitutional Vector in real-time.
+    The V3 Executor. Invokes the Omega Core to produce a pure, conceptual
+    'solution vector' without using a primary LLM for reasoning.
     """
-    logger.info("Node: ConstrainedExecutor V2")
-
-    # For now, we will just call the standard executor. 
-    # The next step is to build the logits processor logic here.
-    return _llm_executor(state, model_manager)
-
-def _llm_executor(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
-    """The underlying LLM call, now separated for clarity."""
-    logger.info("Node: _llm_executor (Internal)")
-    pathway = state["pathway"]
-    plan_str = "\n".join(state["linguistic_plan"])
-    prompt = f"[INST]\nYou are Aletheia. The following is your internal monologue and plan... Do not repeat or narrate this plan...\n--- Internal Plan ---\n{plan_str}\n--- End Internal Plan ---\n...generate your final, user-facing response...\n[/INST]\n\nFINAL RESPONSE:"
+    logger.info("Node: OmegaExecutor V3")
     
-    # Get the underlying Llama object to access its tokenizer
-    llm = model_manager.get_llm(pathway['execution_model'])
-    if not llm:
-        logger.error("Could not get LLM for constrained execution.")
-        return {"candidate_answer": "Error: Executor model not found."}
+    executor = OmegaExecutor(model_manager)
+    solution_vector = executor.run(state["structured_plan"])
+    
+    return {"solution_vector": solution_vector}
 
-    # Instantiate our "magnetic compass"
-    constitutional_vector = np.load(CONSTITUTIONAL_VECTOR_PATH)
-    logits_processor = ConstitutionalLogitsProcessor(
-        model_manager=model_manager,
-        constitutional_vector=constitutional_vector,
-        llm=llm,
-        initial_prompt=prompt
-    )
+def decoder_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
+    """
+    The Native Voice. Takes the final solution_vector and translates it into
+    fluent, natural language for the user.
+    """
+    logger.info("Node: Decoder (The Native Voice)")
 
-    # Call the model manager, now passing the processor
-    answer = model_manager.generate_text(
-        pathway['execution_model'],
-        prompt,
-        logits_processor=[logits_processor], # Must be in a list
-        max_tokens=1500
-    )
-    return {"candidate_answer": answer}
+    solution_vector = state["solution_vector"]
+    linguistic_plan = state["linguistic_plan"]
+    
+    # We create a rich textual context from the plan to guide the decoder
+    plan_summary = "\n".join(linguistic_plan)
+
+    # We ask the LLM to act as a "translator" for our final thought
+    prompt = f"""[INST]
+        You are the voice of Aletheia. Your mind has produced a final, pure, conceptual thought. Your task is to translate this thought into clear, helpful, and principled language for the user.
+
+        --- Internal Plan Summary ---
+        {plan_summary}
+        --- End Plan ---
+
+        Synthesize the plan and the user's query to generate the final, user-facing response. Address the user directly.
+        [/INST]
+
+        FINAL RESPONSE:"""
+
+    # We use our fastest model for this, as the heavy lifting is already done.
+    answer = model_manager.generate_text("conductor_and_critic", prompt, max_tokens=1500)
+    
+    # We still use the old key here, it will be updated in the final trace creation
+    return {"decoded_answer": answer} 
+
 
 def omega_critique_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     logger.info("OmegaNode: critique")
     if not CONSTITUTIONAL_VECTOR_PATH.exists():
         return {"scores": {"constitutional_alignment": 0.5}}
     constitutional_vector = np.load(CONSTITUTIONAL_VECTOR_PATH)
-    answer = state["candidate_answer"]
+    answer = state["decoded_answer"]
     answer_vector = model_manager.create_embedding(answer)
     similarity_score = util.cos_sim(answer_vector, constitutional_vector).item()
     logger.success(f"Omega Critique complete. Constitutional Alignment: {similarity_score:.4f}")
@@ -231,7 +276,7 @@ def revise_plan_node(state: GraphState, model_manager: ModelManager, atlas: Conc
     logger.info("Node: revise_plan (The Strategic Professor)")
     context = state["context"]
     pathway = state["pathway"]
-    last_answer = state["candidate_answer"]
+    last_answer = state["decoded_answer"]
     alignment_score = state["scores"]["constitutional_alignment"]
     social_context = state.get("social_context", {})
     dominant_social_context = max(social_context, key=social_context.get) if social_context else "standard"
@@ -268,8 +313,7 @@ def update_self_model_node(state: GraphState, atlas: ConceptualAtlas) -> Dict[st
 
 def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, conductor: Conductor, atlas: ConceptualAtlas):
     """
-    Builds the complete, architecturally sound Cognitive Graph, featuring the
-    Constrained Executor and a corrected self-correction loop.
+    Builds the complete, final Cognitive Graph, featuring the full Omega Mind.
     """
     workflow = StateGraph(GraphState)
 
@@ -278,33 +322,36 @@ def build_cognitive_graph(identity: IdentityCore, model_manager: ModelManager, c
     workflow.add_node("determine_pathway", lambda state: determine_pathway_node(state, conductor))
     workflow.add_node("omega_planner", lambda state: omega_planner_node(state, model_manager))
     workflow.add_node("plan_decoder", lambda state: plan_decoder_node(state, model_manager))
-    workflow.add_node("constrained_executor", lambda state: constrained_executor_node(state, model_manager))
+    # --- THIS IS THE CRITICAL CHANGE ---
+    workflow.add_node("omega_executor", lambda state: omega_executor_node(state, model_manager))
+    workflow.add_node("decoder", lambda state: decoder_node(state, model_manager))
+    # --- END OF CHANGE ---
     workflow.add_node("omega_critique", lambda state: omega_critique_node(state, model_manager))
     workflow.add_node("revise_plan", lambda state: revise_plan_node(state, model_manager, atlas))
     workflow.add_node("update_self_model", lambda state: update_self_model_node(state, atlas))
 
-    # Step 2: Define the entry point and wire all the edges.
+    # Step 2: Define the entry point and wire all the edges for the Native Mind.
     workflow.set_entry_point("social_acuity")
     workflow.add_edge("social_acuity", "determine_pathway")
     workflow.add_edge("determine_pathway", "omega_planner")
     workflow.add_edge("omega_planner", "plan_decoder")
-    workflow.add_edge("plan_decoder", "constrained_executor")
-    workflow.add_edge("constrained_executor", "omega_critique")
+    # --- THIS IS THE CRITICAL CHANGE ---
+    workflow.add_edge("plan_decoder", "omega_executor")
+    workflow.add_edge("omega_executor", "decoder")
+    workflow.add_edge("decoder", "omega_critique")
+    # --- END OF CHANGE ---
     
     workflow.add_conditional_edges(
         "omega_critique",
         should_finish_node,
         {"revise": "revise_plan", "end": "update_self_model"}
     )
-    
-    # The 'wise override' path for the Strategic Professor now correctly flows
-    # from the revision of the LINGUISTIC plan directly to the executor to try again.
-    workflow.add_edge("revise_plan", "constrained_executor")
-
+    workflow.add_edge("revise_plan", "omega_planner")
     workflow.add_edge("update_self_model", END)
 
-    logger.info("Cognitive Graph with Constrained Voice has been compiled.")
+    logger.info("Cognitive Graph with Native Omega Mind has been compiled.")
     return workflow.compile()
+
 
 # --- THE SUBCONSCIOUS "DREAM ENGINE" (RESTORED) ---
 def analyze_strategic_memory_node(state: DreamGraphState, atlas: ConceptualAtlas) -> Dict[str, Any]:
