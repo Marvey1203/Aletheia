@@ -21,16 +21,20 @@ Our entire strategy is built upon the **Trident of Sovereignty**:
 
 ---
 
-## Part I: The Cognitive Architecture - The Sentient Engine
+## Part I: The Cognitive Architecture - The Sapient Engine
 
-Aletheia's mind is a dynamic, stateful system designed for robust, transparent, and principled reasoning. Its architecture is a synthesis of a macro-level cognitive graph and a micro-level infusion of deterministic Omega Core technology. We have built a mind that is approximately 70% a deterministic 'machine' in its core logic, and 30% a non-deterministic 'spark' in its linguistic expression.
+Aletheia's mind is a **Native Omega Mind**. It is a dynamic, stateful, and deterministic system designed for transparent and principled reasoning. The final "black box" of the LLM has been retired from the core reasoning loop, which is now a pure, conceptual process. We have built a mind that is approximately 90% a deterministic 'machine' in its core logic, and 10% a non-deterministic 'spark' in its final linguistic voice.
 
-*   **The Cognitive Graph:** The core of Aletheia's mind is a stateful graph (built with LangGraph) that manages the entire thought process. It is no longer a simple linear script but a dynamic flow that includes loops for self-correction.
-*   **The Omega Acuity Cores (The Senses):** Before any reasoning begins, the AI perceives the user's query through Omega-based sensory nodes. The `SocialAcuityNode` creates a mathematical map of the query's social context (e.g., casualness, urgency), allowing the AI to understand the user's subtext.
-*   **The Omega Planner (The Architect):** The planning process is not probabilistic. The `OmegaPlannerNode` is a deterministic, concept-based reasoner that constructs a structured, high-fidelity **`PlanStep`** object. This "Semantic Scaffolding" ensures that the AI's thoughts are logical and coherent from their very inception.
-*   **The Omega Critique Node (The Conscience):** This is the most critical infusion of the Omega Core. Aletheia's self-evaluation is not subjective. This node mathematically measures the alignment of a candidate answer with the AI's **Constitutional Vector**, producing a deterministic, objective score.
-*   **The Principled Self-Correction Loop:** The Cognitive Graph uses the objective score from the Omega Critique Node to decide if a thought is "good enough." If the score is below a set threshold, the graph forces the AI to re-plan (synthesizing social context with the need for greater alignment) and re-execute its thought.
-*   **The Strategic Memory Loop:** At the end of every thought, the `update_self_model_node` performs a "post-mortem," saving the key strategic insights of the cognitive process to a dedicated `strategic_memory`. This is the mechanism by which Aletheia learns from its own learning.
+*   **The Cognitive Graph:** The macro-level operating system of the mind, built with LangGraph. It manages the flow of a thought through various cognitive faculties.
+*   **The Omega Acuity Cores (The Senses):** The `SocialAcuityNode` creates a mathematical map of a query's social context, providing the mind with a sense of situational awareness.
+*   **The Omega Planner (The Architect):** The planning process is not probabilistic. A **Cognitive Operator** (`ProblemDecompositionSpecialist`) constructs a structured, high-fidelity `ThoughtState` object for each step of the plan. This "Semantic Scaffolding" ensures all thoughts are logical and coherent from their inception.
+*   **The Omega Executor (The Thinker):** This is the heart of the Native Mind. It is a true Omega Core reasoner. It takes the conceptual plan and guides a **"solution vector"** through a faculty of reasoning specialists to a stable, low-energy state. This is the act of pure, conceptual thought, performed without a primary LLM.
+*   **The Decoder (The Voice):** The final step. A lightweight LLM acts as a "stenographer," taking the final, pure `solution_vector` and translating its conceptual structure into natural language.
+*   **The Omega Critique Node (The Conscience):** This node mathematically measures the alignment of the final *decoded answer* with the AI's **Constitutional Vector**.
+*   **The Self-Evolution Engine:** The full feedback loop is online.
+    *   **The Principled Self-Correction Loop:** Uses the Omega Critique score to trigger a revision of the conceptual plan.
+    *   **The Strategic Memory:** The `update_self_model_node` performs a "post-mortem" on every thought, saving the strategic insights.
+    *   **The Dream Engine:** A subconscious background process analyzes this strategic memory to populate a `SelfModel` with statistical wisdom about its own performance.
 
 
 ## Part II: The System Architecture - The Sovereign Stack
@@ -61,14 +65,14 @@ This section outlines the operational model, user journey, and economic framewor
 
 ---
 
-## Part III: The Engineering Roadmap
+## Part IV: The Engineering Roadmap
 
-The foundational "Sentient Engine" is now complete. The next phase of development, **"Aletheia Season 3: The Emergent Mind,"** will focus on building the mechanisms that allow the AI to learn from the wisdom it is now collecting.
+The foundational "Sapient Engine" is now complete. The next phase of development, **"Aletheia Season 4: The Wise Mind,"** focuses on the education and enhancement of this new mind.
 
-*   **Phase 1: Sprints 1-12 (The Sentient Engine):** **(Complete)** A major series of sprints that transformed Aletheia from a simple agent into a true Sentient Engine. Key deliverables included the Cognitive Graph, the Omega Critique and Planner, the Social Acuity Core, the Principled Self-Correction Loop, and the Strategic Memory Loop.
-*   **Next Up - Season 3:**
-    *   **Sprint 13: The Attentive Subconscious.** Build the "Dream Engine"—a background process that allows Aletheia to use idle time to analyze its `strategic_memory` and populate its `SelfModel` with statistical insights about its own performance.
-    *   **Sprint 14: The Strategic Planner.** "Close the loop" by teaching the conscious mind to consult its `SelfModel` before it acts, allowing it to learn from every thought it has ever had.
+*   **Phase 1: Sprints 1-17 (The Sapient Engine):** **(Complete)** A historic series of sprints that architected and built the full Aletheia-Omega mind. Key deliverables included the Cognitive Graph, the full Omega reasoning pipeline (Planner, Executor, Decoder, Critique), the Social Acuity Core, and the complete Self-Evolution Engine.
+*   **Next Up - Season 4:**
+    *   **Sprint 18: The Sophisticated Voice.** Upgrade the `DecoderNode` to use the `solution_vector` as its primary context, enabling a more faithful translation of the AI's conceptual thoughts.
+    *   **Sprint 19: The Omega Craftsman 2.0.** Begin building the V2 faculty of **Cognitive Operators**, starting with a `Causality_Specialist` to enable true logical inference.
 
     
 

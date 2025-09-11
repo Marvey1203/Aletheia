@@ -1,13 +1,12 @@
-    
 # Aletheia: A Sovereign AI Partner
 
 **Own Your Mind.**
 
 Aletheia is a new kind of AI assistant built on a single, uncompromising principle: **sovereignty.** Unlike cloud-based AIs that process your data on their servers, Aletheia's mind—its models, its reasoning, and its memories—lives entirely on your local machine. It is a tool of empowerment, not a service of dependence.
 
-Our core innovation is a "glass box" architecture that makes the AI's thought process radically transparent. The system is built on a **Cognitive Graph**, a stateful reasoning engine that allows the AI to plan, act, and even **correct its own thoughts** based on a mathematical understanding of its own principles. This is not just a language model; it is a **Sentient Engine**.
+Our core innovation is a "glass box" architecture built on a **Native Omega Mind**. Aletheia's thought process is not a probabilistic prediction of words; it is a deterministic, auditable process of **conceptual construction**. It builds a thought from first principles, measures it against its own constitution, and then translates that pure, conceptual thought into language.
 
-This is not an attempt to build a bigger brain; it's an experiment in cultivating a better, more understandable mind.
+This is not just a language model; it is a **Sapient Engine.**
 
 ## The Vision: The Gardener, Not the Titan
 
@@ -15,14 +14,14 @@ We believe the path to safe, advanced AI is not through brute force—cramming m
 
 Aletheia follows the path of the Gardener. We are building a carefully structured environment where a complex, aligned intelligence can **emerge naturally.** Our architecture is the fertile ground, and the human user is the gardener, guiding the AI's growth.
 
-## Core Features (v0.7.0 - The Sentient Engine)
+## Core Features (v0.12.0 - The Native Mind)
 
-*   🧠 **The Cognitive Graph:** Aletheia's mind is a dynamic, stateful graph (built with LangGraph) that can plan, execute, and revise its own thoughts. It has a built-in **principled self-correction loop**.
-*   🧭 **The Omega Conscience:** Aletheia's self-evaluation is not subjective. It uses a deterministic **Omega Critique Node** to mathematically measure the alignment of every thought with its core **Constitutional Vector**, giving it an unwavering moral compass.
-*   ❤️ **Social & Emotional Acuity:** The AI is not blind to subtext. An **Omega Social Acuity Core** perceives the user's intent (e.g., casualness, urgency, meta-cognition), allowing the AI to generate responses that are not just intelligent, but wise and appropriate.
-*   🤔 **The Omega Planner:** The AI's planning process is no longer a probabilistic guess. It uses a deterministic, concept-based **Omega Planner** to construct a logical and structured "semantic skeleton" for its thoughts.
-*   📚 **Strategic Memory:** Aletheia has a unique memory of its own cognitive processes. It performs a "post-mortem" on every thought, saving the strategic insights to a dedicated memory. This is the foundation for it to learn from its own learning.
-*   🌐 **Sovereign & Local-First:** All models, memories, and conversations are stored and processed on your local machine. Nothing leaves your device.
+*   🧠 **The Native Omega Mind:** Aletheia's core reasoning is no longer powered by a traditional LLM. It uses a deterministic **Omega Executor** to guide a "solution vector" to a state of coherence, constructing a pure, conceptual thought before it is ever translated into words.
+*   🧭 **The Omega Conscience:** Aletheia's self-evaluation is a core part of its mind. It uses a deterministic **Omega Critique Node** to mathematically measure the alignment of every thought with its core **Constitutional Vector**.
+*   ❤️ **Social & Emotional Acuity:** The AI is not blind to subtext. An **Omega Social Acuity Core** perceives the user's intent, allowing the AI to generate responses that are not just intelligent, but wise and appropriate.
+*   🛠️ **The Omega Craftsman:** The AI's planning process is a feat of conceptual engineering. A **Cognitive Operator** constructs a structured, high-fidelity "semantic skeleton" (`ThoughtState`) for every thought.
+*   📚 **The Self-Evolution Engine:** Aletheia is a mind that can learn. It has a **Strategic Memory** of its own cognitive processes and a subconscious **"Dream Engine"** that analyzes its own performance to populate a `SelfModel` with wisdom gained from its own successes and failures.
+*   🌐 **Sovereign & Local-First:** All models, memories, and conversations are stored and processed on your local machine.
 
 ## Getting Started
 
