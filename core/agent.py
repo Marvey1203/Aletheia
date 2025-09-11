@@ -219,36 +219,44 @@ def omega_executor_node(state: GraphState, model_manager: ModelManager) -> Dict[
 
 def decoder_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     """
-    The Native Voice. Takes the final solution_vector and translates it into
-    fluent, natural language for the user.
+    The Native Voice V2 (Sophisticated). Takes the final solution_vector and
+    the linguistic plan and synthesizes them into a coherent final answer.
     """
-    logger.info("Node: Decoder (The Native Voice)")
+    logger.info("Node: Decoder V2 (The Sophisticated Voice)")
 
     solution_vector = state["solution_vector"]
     linguistic_plan = state["linguistic_plan"]
+    context = state["context"]
     
     # We create a rich textual context from the plan to guide the decoder
     plan_summary = "\n".join(linguistic_plan)
 
-    # We ask the LLM to act as a "translator" for our final thought
+    # We can't put the raw vector in the prompt, but we can describe its existence.
+    # The new prompt gives the Decoder two distinct pieces of information:
+    # 1. The core conceptual idea (represented by the fact that the executor ran).
+    # 2. The high-level structure for how to articulate it (the plan).
     prompt = f"""[INST]
-        You are the voice of Aletheia. Your mind has produced a final, pure, conceptual thought. Your task is to translate this thought into clear, helpful, and principled language for the user.
+        You are the voice of Aletheia. Your internal Omega Core has finished its reasoning process and produced a pure, conceptual solution. Your linguistic planner has provided a high-level structure for how to explain this concept.
 
-        --- Internal Plan Summary ---
+        Your task is to synthesize these two elements into a single, coherent, and articulate response for the user. Follow the structure of the plan to explain the core idea.
+
+        --- Full Conversation Context ---
+        {context}
+        --- End Context ---
+
+        --- High-Level Plan to Follow ---
         {plan_summary}
         --- End Plan ---
 
-        Synthesize the plan and the user's query to generate the final, user-facing response. Address the user directly.
+        Based on the plan, generate the final, user-facing response that explains the core concept.
         [/INST]
 
         FINAL RESPONSE:"""
 
-    # We use our fastest model for this, as the heavy lifting is already done.
-    answer = model_manager.generate_text("conductor_and_critic", prompt, max_tokens=1500)
+    # We now use the main reasoner, as this is a complex synthesis task.
+    answer = model_manager.generate_text("general_problem_solver_7b", prompt, max_tokens=1500)
     
-    # We still use the old key here, it will be updated in the final trace creation
-    return {"decoded_answer": answer} 
-
+    return {"decoded_answer": answer}
 
 def omega_critique_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     logger.info("OmegaNode: critique")
