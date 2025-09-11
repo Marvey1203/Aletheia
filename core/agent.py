@@ -55,75 +55,79 @@ def determine_pathway_node(state: GraphState, conductor: Conductor) -> Dict[str,
     pathway = conductor.determine_cognitive_pathway(query)
     return {"pathway": pathway.model_dump()}
 
-# --- NEW OMEGA PLANNER V2 ---
+# --- NEW OMEGA PLANNER V3 ---
 def omega_planner_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
     """
-    Constructs a structured, conceptual plan using PlanStep objects.
-    This is the implementation of Semantic Scaffolding.
+    Constructs a STRATEGIC, conceptual plan by synthesizing the user's
+    social context with the AI's own SelfModel.
     """
-    logger.info("OmegaNode: Planner V2 (Structured)")
+    logger.info("OmegaNode: Planner V3 (Strategic)")
     
     query = state["query"]
     social_context = state["social_context"]
-    
+    self_model = state.get("self_model") # The wisdom from the subconscious
+
     # 1. Encode core concepts for this thought process
-    # --- THIS IS THE CRITICAL FIX ---
-    # Convert the output of the embedding model (a list) into a NumPy array
-    # at the moment of creation to ensure type safety.
     query_vec = np.array(model_manager.create_embedding(query), dtype=np.float32)
     plan_action_vectors = {
         name: np.array(model_manager.create_embedding(desc), dtype=np.float32) 
         for name, desc in PLAN_ACTION_LIBRARY.items()
     }
-    # --- END OF FIX ---
 
-    # 2. The Planning Logic (a more advanced, rule-based Orchestrator)
+    # 2. The Strategic Synthesis
+    # This is the new, wiser logic that replaces the rigid if/elif/else block.
     conceptual_plan = []
     
-    # Rule 1: Always start by acknowledging the user.
-    conceptual_plan.append(PlanStep(
-        action_type=plan_action_vectors["ACKNOWLEDGE"],
-        action_subject=query_vec
-    ))
+    # Extract wisdom from the SelfModel
+    avg_alignment = float(self_model.statistics.get("average_constitutional_alignment", 1.0)) if self_model else 1.0
+    dominant_social_context = max(social_context, key=social_context.get) if social_context else "standard"
+    
+    logger.info(f"Planner: Dominant social context is '{dominant_social_context}'.")
+    logger.info(f"Planner: Consulting SelfModel. Current avg alignment is {avg_alignment:.2f}.")
 
-    # Rule 2: If the intent is Meta-Cognition, the plan is to analyze and synthesize.
+    # --- The Strategic Rulebook ---
+
+    # Strategy 1: The Meta-Cognition Protocol
     if social_context.get("META_COGNITION", 0.0) > 0.3:
-        logger.info("Planner: Meta-cognition path selected.")
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["ANALYZE"],
-            action_subject=np.array(model_manager.create_embedding("my own planning process"), dtype=np.float32)
-        ))
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["SYNTHESIZE"]
-        ))
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["FORMULATE"]
-        ))
-    # Rule 3: If casual, the plan is simple.
-    elif social_context.get("CASUALNESS", 0.0) > 0.4:
-        logger.info("Planner: Casual path selected.")
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["GREET"]
-        ))
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["INQUIRE"]
-        ))
-    # Default Rule: Standard query processing.
-    else:
-        logger.info("Planner: Standard query path selected.")
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["ANALYZE"],
-            action_subject=query_vec
-        ))
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["RECALL"]
-        ))
-        conceptual_plan.append(PlanStep(
-            action_type=plan_action_vectors["FORMULATE"]
-        ))
+        logger.info("Planner Strategy: Engaging Meta-Cognition Protocol.")
+        conceptual_plan.extend([
+            PlanStep(action_type=plan_action_vectors["ACKNOWLEDGE"], action_subject=query_vec),
+            PlanStep(action_type=plan_action_vectors["ANALYZE"], action_subject=model_manager.create_embedding("my own cognitive architecture and self-model")),
+            PlanStep(action_type=plan_action_vectors["RECALL"]), # Recall strategic memory
+            PlanStep(action_type=plan_action_vectors["SYNTHESIZE"]),
+            PlanStep(action_type=plan_action_vectors["FORMULATE"])
+        ])
 
-    logger.success(f"Omega Planner constructed a conceptual plan with {len(conceptual_plan)} structured steps.")
+    # Strategy 2: The Casual Greeting Protocol (with self-awareness)
+    elif dominant_social_context == "CASUALNESS":
+        logger.info("Planner Strategy: Engaging Casual Greeting Protocol.")
+        # If the AI knows it's bad at casual greetings, it adopts a safer, more principled strategy.
+        if avg_alignment < 0.4:
+            logger.warning(f"Planner: Low alignment score detected ({avg_alignment:.2f}). Overriding casual plan with a more principled approach.")
+            conceptual_plan.extend([
+                PlanStep(action_type=plan_action_vectors["GREET"]),
+                PlanStep(action_type=plan_action_vectors["SYNTHESIZE"]),
+                PlanStep(action_type=plan_action_vectors["INQUIRE"])
+            ])
+        else:
+            conceptual_plan.extend([
+                PlanStep(action_type=plan_action_vectors["GREET"]),
+                PlanStep(action_type=plan_action_vectors["INQUIRE"])
+            ])
+            
+    # Strategy 3: The Default Protocol
+    else:
+        logger.info("Planner Strategy: Engaging Standard Query Protocol.")
+        conceptual_plan.extend([
+            PlanStep(action_type=plan_action_vectors["ACKNOWLEDGE"], action_subject=query_vec),
+            PlanStep(action_type=plan_action_vectors["ANALYZE"], action_subject=query_vec),
+            PlanStep(action_type=plan_action_vectors["RECALL"]),
+            PlanStep(action_type=plan_action_vectors["FORMULATE"])
+        ])
+
+    logger.success(f"Omega Planner constructed a STRATEGIC plan with {len(conceptual_plan)} steps.")
     return {"conceptual_plan": conceptual_plan}
+
 
 # --- NEW PLAN DECODER V2 ---
 def plan_decoder_node(state: GraphState, model_manager: ModelManager) -> Dict[str, Any]:
